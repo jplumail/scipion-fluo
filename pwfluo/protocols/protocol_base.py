@@ -38,7 +38,7 @@ from pyworkflow.protocol.params import (
 from pyworkflow.utils.properties import Message
 
 import pwfluo.objects as pwfluoobj
-from pwfluo.protocols.import_.base import ProtImport, ProtImportFile, ProtImportFiles
+from pwfluo.protocols.import_ import ProtImport, ProtImportFile, ProtImportFiles
 
 
 class ProtFluoBase:
