@@ -1,4 +1,4 @@
-scipion-pyworkflow == 3.0.1 ; platform_system == "Windows"
+scipion-pyworkflow @ git+https://github.com/jplumail/scipion-pyworkflow@windows ; platform_system == "Windows"
 scipion-pyworkflow ; platform_system != "Windows"
 scipy
 numpy
