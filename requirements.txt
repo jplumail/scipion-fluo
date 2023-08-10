@@ -1,4 +1,5 @@
-scipion-pyworkflow
+scipion-pyworkflow == 3.0.1 ; platform_system == "Windows"
+scipion-pyworkflow ; platform_system != "Windows"
 scipy
 numpy
 aicsimageio
