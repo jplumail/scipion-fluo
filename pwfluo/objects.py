@@ -36,6 +36,7 @@ import pyworkflow.object as pwobj
 # type: ignore
 import pyworkflow.utils as pwutils  # type: ignore
 from aicsimageio import AICSImage
+from aicsimageio.readers.reader import Reader
 from aicsimageio.types import ImageLike, PathLike
 from aicsimageio.writers.ome_tiff_writer import OmeTiffWriter
 from numpy.typing import NDArray
@@ -281,9 +282,7 @@ class ImageDim(CsvList, FluoObject):
         if (x is None) or (y is None) or (z is None):
             s = "No-Dim"
         else:
-            s = "%d x %d" % (x, y)
-            if z > 1:
-                s += " x %d" % z
+            s = "%d x %d x %d" % (x, y, z)
         return s
 
 
@@ -324,7 +323,12 @@ class VoxelSize(CsvList, FluoObject):
 class Image(FluoObject):
     """Represents an image object"""
 
-    def __init__(self, data: Optional[ImageLike] = None, **kwargs) -> None:
+    def __init__(
+        self,
+        data: Optional[ImageLike] = None,
+        reader: Optional[Reader] = None,
+        **kwargs,
+    ) -> None:
         """
          Params:
         :param location: Could be a valid location: (index, filename)
@@ -349,25 +353,51 @@ class Image(FluoObject):
         self._origin: Transform = Transform()
         self._imageDim: ImageDim = ImageDim()
         self._num_channels: Integer = Integer()
+        self.reader = reader
         if data is not None:
-            self.img = AICSImage(data)
             if type(data) is str:
                 self.setFileName(data)
+            else:
+                self.img = Image.read(data, reader=self.reader)
+
+    @classmethod
+    def read(cls, img: ImageLike, reader: Optional[Reader] = None):
+        return AICSImage(img, reader=reader)
 
     @property
     def img(self) -> Optional[AICSImage]:
-        if self._img is None and (fname := self.getFileName()) is not None:
-            self.img = AICSImage(fname)
+        if (
+            self._img is None and (fname := self.getFileName()) is not None
+        ):  # if data was not set, but filename present
+            self.img = Image.read(fname, reader=self.reader)
         return self._img
 
     @img.setter
     def img(self, img: Optional[AICSImage]) -> None:
+        print("CALLED")
         self._img = img
-        if self.img is not None:
+        if self.img is not None:  # image data exists, meaning img arg was not None
             d = self.img.dims
+            print(d)
             x, y, z = d.X, d.Y, d.Z
-            self._imageDim.set_((x, y, z))
-            self._num_channels.set(d.C)
+            if d.T > 1:
+                if d.Z == 1:  # reshape data T <> Z
+                    print("WARNING: REWRITING THE IMAGE")
+                    new_path = self.getFileName()
+                    OmeTiffWriter.save(
+                        data=self.img.data.transpose(2, 1, 0, 3, 4),
+                        uri=new_path,
+                        physical_pixel_sizes=self.img.physical_pixel_sizes,
+                    )
+                    self.setFileName(new_path)  # re-enter the setter func
+                else:
+                    raise ValueError(
+                        f"{img} is a serie of images. Dims is {self.img.dims}."
+                        "Should be one image."
+                    )
+            else:
+                self._imageDim.set_((x, y, z))
+                self._num_channels.set(d.C)
 
     def getData(self) -> Union[NDArray, None]:
         if self.img is not None:
@@ -428,7 +458,7 @@ class Image(FluoObject):
     def setFileName(self, filename: str) -> None:
         """Use the _objValue attribute to store filename."""
         self._filename.set(filename)
-        self.img = AICSImage(filename)
+        self.img = Image.read(filename, reader=self.reader)
 
     def getBaseName(self) -> str:
         return os.path.basename(self.getFileName())
