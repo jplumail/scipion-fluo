@@ -519,9 +519,6 @@ class Image(FluoObject):
         return set([self.getFileName()])
 
     def build_ome(self, image_name: Optional[str] = None) -> OME:
-        im = self.getData()
-        if im is None:
-            raise ValueError("Image is None.")
         return OmeTiffWriter.build_ome(
             data_shapes=[self.img.shape],
             data_types=[self.img.dtype],
@@ -536,7 +533,7 @@ class Image(FluoObject):
         if self._img is None:
             raise ValueError("Image is None.")
         if apply_transform:
-            im_data = affine_transform(self._img, self.getTransform().getMatrix())
+            im_data = affine_transform(self.getData(), self.getTransform().getMatrix())
         else:
             im_data = self.getData()
 
