@@ -141,7 +141,7 @@ class ProtImportFluoImages(ProtFluoImportFiles):
                 )
 
                 if (vs_xy := self.vs_xy.get()) and (vs_z := self.vs_z.get()):
-                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (nm/px)")
+                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (μm/px)")
 
         except Exception as e:
             print(e)
@@ -154,7 +154,7 @@ class ProtImportFluoImages(ProtFluoImportFiles):
             vs_xy, vs_z = self.vs_xy.get(), self.vs_z.get()
             methods.append(
                 f"{self._getTomMessage()} imported with a voxel size "
-                f"*{vs_xy:.2f}x{vs_z:.2f}* (nm/px)"
+                f"*{vs_xy:.2f}x{vs_z:.2f}* (μm/px)"
             )
         return methods
 
@@ -272,7 +272,7 @@ class ProtImportSetOfParticles(ProtFluoImportFiles):
                 )
 
                 if (vs_xy := self.vs_xy.get()) and (vs_z := self.vs_z.get()):
-                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (nm/px)")
+                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (μm/px)")
 
         except Exception as e:
             print(e)
@@ -285,7 +285,7 @@ class ProtImportSetOfParticles(ProtFluoImportFiles):
             vs_xy, vs_z = self.vs_xy.get(), self.vs_z.get()
             methods.append(
                 f"{self._getTomMessage()} imported with a voxel size "
-                f"*{vs_xy:.2f}x{vs_z:.2f}* (nm/px)"
+                f"*{vs_xy:.2f}x{vs_z:.2f}* (μm/px)"
             )
         return methods
 
@@ -411,7 +411,7 @@ class ProtImportFluoImage(ProtFluoImportFile):
                 )
 
                 if (vs_xy := self.vs_xy.get()) and (vs_z := self.vs_z.get()):
-                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (nm/px)")
+                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (μm/px)")
 
         except Exception as e:
             print(e)
@@ -424,7 +424,7 @@ class ProtImportFluoImage(ProtFluoImportFile):
             vs_xy, vs_z = self.vs_xy.get(), self.vs_z.get()
             methods.append(
                 f"{self._getTomMessage()} imported with a voxel size "
-                f"*{vs_xy:.2f}x{vs_z:.2f}* (nm/px)"
+                f"*{vs_xy:.2f}x{vs_z:.2f}* (μm/px)"
             )
         return methods
 
@@ -527,7 +527,7 @@ class ProtImportPSFModel(ProtFluoImportFile):
                 )
 
                 if (vs_xy := self.vs_xy.get()) and (vs_z := self.vs_z.get()):
-                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (nm/px)")
+                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (μm/px)")
 
         except Exception as e:
             print(e)
@@ -540,7 +540,7 @@ class ProtImportPSFModel(ProtFluoImportFile):
             vs_xy, vs_z = self.vs_xy.get(), self.vs_z.get()
             methods.append(
                 f"{self._getTomMessage()} imported with a voxel size "
-                f"*{vs_xy:.2f}x{vs_z:.2f}* (nm/px)"
+                f"*{vs_xy:.2f}x{vs_z:.2f}* (μm/px)"
             )
         return methods
 

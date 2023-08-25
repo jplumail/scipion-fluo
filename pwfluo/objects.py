@@ -541,7 +541,7 @@ class Image(FluoObject):
         """String representation of an Image."""
         return (
             f"{self.getClassName()} ({str(self._imageDim)}, "
-            f"{str(self._voxelSize)} nm/px, "
+            f"{str(self._voxelSize)} μm/px, "
             f"{str(self._num_channels)} channel(s)))"
         )
 
@@ -619,7 +619,7 @@ class Coordinate3D(FluoObject):
 
     def __init__(self, **kwargs) -> None:
         FluoObject.__init__(self, **kwargs)
-        self._boxSize: int = 0
+        self._boxSize: float = 0
         self._imagePointer: Pointer = Pointer(objDoStore=False)  # points to a FluoImage
         self._transform: Transform = Transform()
         self._groupId: Integer = Integer(
@@ -1037,7 +1037,7 @@ class SetOfImages(FluoSet):
         if not voxel_size:
             raise RuntimeError("Voxel size is not set")
 
-        return f"{voxel_size[0]:.2f}x{voxel_size[1]:.2f} nm/px"
+        return f"{voxel_size[0]:.2f}x{voxel_size[1]:.2f} μm/px"
 
     def _channelsStr(self):
         c = self.getNumChannels()
@@ -1106,18 +1106,18 @@ class SetOfCoordinates3D(FluoSet):
 
     def __init__(self, **kwargs) -> None:
         FluoSet.__init__(self, **kwargs)
-        self._boxSize: Integer = Integer()
+        self._boxSize: Scalar = Scalar()
         self._voxelSize: VoxelSize = VoxelSize()
         self._precedentsPointer: Pointer = (
             Pointer()
         )  # Points to the SetOfFluoImages associated to
         self._images: Optional[Dict[str, FluoImage]] = None
 
-    def getBoxSize(self) -> int:
+    def getBoxSize(self) -> float:
         """Return the box size of the particles."""
         return self._boxSize.get()
 
-    def setBoxSize(self, boxSize: int) -> None:
+    def setBoxSize(self, boxSize: float) -> None:
         """Set the box size of the particles."""
         self._boxSize.set(boxSize)
 
@@ -1245,15 +1245,14 @@ class SetOfCoordinates3D(FluoSet):
     def __str__(self) -> str:
         """String representation of a set of coordinates."""
         if self._boxSize.hasValue():
-            boxSize = self._boxSize.get()
-            boxStr = " %d x %d x %d" % (boxSize, boxSize, boxSize)
+            boxSize = float(self._boxSize.get()) / 1000
+            boxStr = f" {boxSize:.1f} x {boxSize:.1f} x {boxSize:.1f} μm"
         else:
             boxStr = "No-Box"
-        s = "%s (%d items, %s, %s nm/px%s)" % (
+        s = "%s (%d items, %s%s)" % (
             self.getClassName(),
             self.getSize(),
             boxStr,
-            self.getVoxelSize(),
             self._appendStreamState(),
         )
 
