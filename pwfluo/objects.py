@@ -374,11 +374,9 @@ class Image(FluoObject):
 
     @img.setter
     def img(self, img: Optional[AICSImage]) -> None:
-        print("CALLED")
         self._img = img
         if self.img is not None:  # image data exists, meaning img arg was not None
             d = self.img.dims
-            print(d)
             x, y, z = d.X, d.Y, d.Z
             if d.T > 1:
                 if d.Z == 1:  # reshape data T <> Z
