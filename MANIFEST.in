@@ -3,3 +3,4 @@
 
 # Include the requirement file
 include requirements.txt
+include requirements-dev.txt
