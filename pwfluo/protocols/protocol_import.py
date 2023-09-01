@@ -454,6 +454,7 @@ class ProtImportPSFModel(ProtFluoImportFile):
     _label = "import psf"
     _devStatus = BETA
     _possibleOutputs = {OUTPUT_NAME: PSFModel}
+    READERS = list(map(lambda x: getattr(x, "__name__"), AICSImage.SUPPORTED_READERS))
 
     def __init__(self, **args):
         ProtFluoImportFile.__init__(self, **args)
@@ -461,6 +462,19 @@ class ProtImportPSFModel(ProtFluoImportFile):
 
     def _defineParams(self, form):
         ProtFluoImportFile._defineParams(self, form)
+
+    def _defineImportParams(self, form: Form) -> None:
+        form.addParam(
+            "reader",
+            params.EnumParam,
+            choices=self.READERS,
+            display=params.EnumParam.DISPLAY_COMBO,
+            label="Reader",
+            help="Choose the reader"
+            "The DefaultReader finds a reader that works for your image."
+            "BioformatsReader corresponds to the ImageJ reader"
+            "(requires java and maven to be installed)",
+        )
 
     def _getImportChoices(self):  # TODO: remove this
         """Return a list of possible choices
@@ -485,7 +499,9 @@ class ProtImportPSFModel(ProtFluoImportFile):
         """
         self.info("")
 
-        img = PSFModel(data=file_path)
+        img = PSFModel(
+            data=file_path, reader=AICSImage.SUPPORTED_READERS[self.reader.get()]
+        )
         img.setVoxelSize(voxelSize)
 
         # Set default origin
