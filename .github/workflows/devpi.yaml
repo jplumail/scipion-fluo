@@ -1,0 +1,32 @@
+name: Publish on Tag
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'  # Replace with your desired Python version
+
+    - name: Install dependencies
+      run: |
+        pip install devpi-client  # Install devpi-client
+
+    - name: Authenticate and upload to devpi
+      run: |
+        devpi use http://vps-429048d2.vps.ovh.net
+        devpi login jean --password=${{ secrets.DEVPI_PASSWORD }}
+        devpi use jean/dev
+        devpi upload
+      env:
+        DEVPI_PASSWORD: ${{ secrets.DEVPI_PASSWORD }}
