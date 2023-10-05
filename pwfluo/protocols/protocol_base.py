@@ -136,17 +136,24 @@ class ProtFluoPicking(ProtImport, ProtFluoBase):
 
 class ProtFluoImportBase(ProtFluoBase):
     READERS = list(map(lambda x: getattr(x, "__name__"), AICSImage.SUPPORTED_READERS))
-    T = TypeVar("T", bound=pwfluoobj.FluoImage)
-    S = TypeVar("S", bound=Set)
 
     def __init__(self):
         self.images = None
 
     def _defineAcquisitionParams(self, form: Form) -> None:
         """Override to add options related to acquisition info."""
-        form.addGroup("Voxel size")
-        form.addParam("vs_xy", FloatParam, label="XY (μm/px)")
-        form.addParam("vs_z", FloatParam, label="Z (μm/px)")
+        group = form.addGroup("Image Info")
+        group.addParam(
+            "importWizard",
+            params.LabelParam,
+            important=True,
+            label="Use the wizard button to import parameters.",
+            help="Depending on the import format, "
+            "the wizard will try to import image parameters.\n"
+            "If not found, required ones should be provided.",
+        )
+        group.addParam("vs_xy", FloatParam, label="XY (μm/px)")
+        group.addParam("vs_z", FloatParam, label="Z (μm/px)")
 
     def _defineImportParams(self, form: Form) -> None:
         form.addParam(
@@ -180,9 +187,7 @@ class ProtFluoImportBase(ProtFluoBase):
 
 
 class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
-    READERS = list(map(lambda x: getattr(x, "__name__"), AICSImage.SUPPORTED_READERS))
     T = TypeVar("T", bound=pwfluoobj.FluoImage)
-    S = TypeVar("S", bound=Set)
 
     def __init__(self, **args):
         ProtImportFiles.__init__(self, **args)

@@ -1,7 +1,7 @@
 import pint
 import pyworkflow.wizard as pwizard
 from pyworkflow.gui import dialog
-from pyworkflow.protocol.params import Form
+from pyworkflow.gui.form import FormWindow
 
 from pwfluo.protocols.protocol_base import ProtFluoImportFile, ProtFluoImportFiles
 
@@ -12,12 +12,12 @@ class FluoWizard(pwizard.Wizard):
 
 class ImportAcquisitionWizard(FluoWizard):
     _targets = [
-        (ProtFluoImportFiles, ["vs_xy", "vs_z"]),
-        (ProtFluoImportFile, ["vs_xy", "vs_z"]),
+        (ProtFluoImportFiles, ["importWizard"]),
+        (ProtFluoImportFile, ["importWizard"]),
     ]
 
     @classmethod
-    def show(cls, form: Form, *params):
+    def show(cls, form: FormWindow, *params):
         try:
             prot = form.protocol  # type: ProtFluoImportFiles | ProtFluoImportFile
             voxel_sizes = prot.loadAcquisitionInfo()
