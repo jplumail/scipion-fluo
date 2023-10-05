@@ -263,7 +263,7 @@ class ImageDim(CsvList, FluoObject):
 
     def set_(self, dims: Optional[Tuple[int, int, int]]) -> None:
         if dims is not None:
-            if all(type(dims[i]) is int for i in range(3)):
+            if all(isinstance(dims[i], int) for i in range(3)):
                 if self.isEmpty():
                     for i in range(3):
                         self.append(dims[i])
@@ -355,7 +355,7 @@ class Image(FluoObject):
         self._num_channels: Integer = Integer()
         self.reader = reader
         if data is not None:
-            if type(data) is str:
+            if isinstance(data, str):
                 self.setFileName(data)
             else:
                 self.img = Image.read(data, reader=self.reader)
