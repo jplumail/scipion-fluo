@@ -26,24 +26,23 @@
 
 import os
 import re
-from typing import List, Optional, Tuple, Type, TypeVar
-import pint
+from typing import List, Optional, Type, TypeVar
 
+import pint
 import pyworkflow as pw
+import pyworkflow.protocol.params as params
+from aicsimageio import AICSImage
+from aicsimageio.readers.default_reader import DefaultReader
+from pyworkflow import utils as pwutils
 from pyworkflow.mapper.sqlite_db import SqliteDb
 from pyworkflow.object import Set
-from pyworkflow.protocol import Protocol
 from pyworkflow.protocol.params import (
     FloatParam,
     Form,
     PointerParam,
 )
-from pyworkflow import utils as pwutils
-from pyworkflow.utils.properties import Message
-import pyworkflow.protocol.params as params
 from pyworkflow.utils.path import createAbsLink, removeExt
-from aicsimageio import AICSImage
-from aicsimageio.readers.default_reader import DefaultReader
+from pyworkflow.utils.properties import Message
 
 import pwfluo.objects as pwfluoobj
 from pwfluo.protocols.import_ import ProtImport, ProtImportFile, ProtImportFiles
@@ -73,7 +72,9 @@ class ProtFluoBase:
         setObj = SetClass(filename=setFn, **kwargs)
         return setObj
 
-    def _createSetOfCoordinates3D(self, volSet: pwfluoobj.SetOfFluoImages, suffix: str = ""):
+    def _createSetOfCoordinates3D(
+        self, volSet: pwfluoobj.SetOfFluoImages, suffix: str = ""
+    ):
         coord3DSet = self._createSet(
             pwfluoobj.SetOfCoordinates3D,
             "coordinates%s.sqlite",
@@ -140,13 +141,13 @@ class ProtFluoImportBase(ProtFluoBase):
 
     def __init__(self):
         self.images = None
-    
+
     def _defineAcquisitionParams(self, form: Form) -> None:
         """Override to add options related to acquisition info."""
         form.addGroup("Voxel size")
         form.addParam("vs_xy", FloatParam, label="XY (μm/px)")
         form.addParam("vs_z", FloatParam, label="Z (μm/px)")
-    
+
     def _defineImportParams(self, form: Form) -> None:
         form.addParam(
             "reader",
@@ -162,7 +163,7 @@ class ProtFluoImportBase(ProtFluoBase):
 
     # --------------------------- INFO functions ------------------------------
     def _getMessage(self) -> str:
-        return ''
+        return ""
 
     def _hasOutput(self):
         return self.images is not None
@@ -186,7 +187,7 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
     def __init__(self, **args):
         ProtImportFiles.__init__(self, **args)
         ProtFluoImportBase.__init__(self)
-    
+
     def importStep(self, obj: Type[T]):
         """Copy images matching the filename pattern
         Register other parameters.
@@ -205,9 +206,7 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
 
         fileNameList = []
         for fileName, fileId in self.iterFiles():
-            img = obj(
-                data=fileName, reader=self.getReader()
-            )
+            img = obj(data=fileName, reader=self.getReader())
             img.setVoxelSize(voxel_size)
 
             # Set default origin
@@ -234,7 +233,10 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
             imgId = removeExt(newFileName)
             img.setImgId(imgId)
 
-            createAbsLink(os.path.abspath(fileName), os.path.abspath(self._getExtraPath(newFileName)))
+            createAbsLink(
+                os.path.abspath(fileName),
+                os.path.abspath(self._getExtraPath(newFileName)),
+            )
 
             img.cleanObjId()
             img.setFileName(self._getExtraPath(newFileName))
@@ -242,26 +244,39 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
 
         imgSet.write()
         self._defineOutputs(**{self.OUTPUT_NAME: imgSet})
-    
+
     def getReader(self):
         if self.reader.get() is not None:
             return AICSImage.SUPPORTED_READERS[self.reader.get()]
         else:
             return DefaultReader
-    
-class ProtFluoImportFile(
-    ProtImportFile, ProtFluoBase
-):  # TODO: find a better architecture
-    def _defineAcquisitionParams(self, form: Form) -> None:
-        """Override to add options related to acquisition info."""
-        form.addGroup("Voxel size")
-        form.addParam("vs_xy", FloatParam, label="XY (μm/px)")
-        form.addParam("vs_z", FloatParam, label="Z (μm/px)")
 
-    def _validate(self):
-        pass
-
-
+    def loadAcquisitionInfo(self):
+        """Return a proper acquisitionInfo (dict)
+        or an error message (str).
+        """
+        voxel_sizes: dict[str, list[float | pint.Quantity]] = {
+            "x": [],
+            "y": [],
+            "z": [],
+        }
+        for fname, _ in self.iterFiles():
+            im = AICSImage(fname, reader=self.getReader())
+            try:
+                pixels = im.ome_metadata.images[0].pixels
+                for d in "xyz":
+                    attr_d = f"physical_size_{d}"
+                    if getattr(pixels, attr_d + "_quantity", None):
+                        voxel_sizes[d].append(
+                            getattr(pixels, attr_d + "_quantity")
+                        )  # returns a pint.Quantity
+                    elif getattr(pixels, attr_d) is not None:
+                        voxel_sizes[d].append(getattr(pixels, attr_d))  # float
+            except NotImplementedError:
+                pass
+        for k in voxel_sizes:
+            voxel_sizes[k] = list(set(voxel_sizes[k]))
+        return voxel_sizes
 
     # --------------------------- INFO functions ------------------------------
     def _summary(self) -> List[str]:
@@ -283,7 +298,9 @@ class ProtFluoImportFile(
     def _getVolumeFileName(self, fileName: str, extension: Optional[str] = None) -> str:
         if extension is not None:
             baseFileName = (
-                "import_" + str(os.path.basename(fileName)).split(".")[0] + ".%s" % extension
+                "import_"
+                + str(os.path.basename(fileName)).split(".")[0]
+                + ".%s" % extension
             )
         else:
             baseFileName = "import_" + str(os.path.basename(fileName)).split(":")[0]
@@ -308,7 +325,7 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
     def __init__(self, **args):
         ProtFluoImportBase.__init__(self)
         ProtImportFile.__init__(self, **args)
-    
+
     def importImageStep(self, obj: type[T]) -> None:
         """Copy the file.
         Register other parameters.
@@ -316,9 +333,7 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
         self.info("")
 
         file_path = self.filePath.get()
-        img = obj(
-            data=file_path, reader=AICSImage.SUPPORTED_READERS[self.reader.get()]
-        )
+        img = obj(data=file_path, reader=AICSImage.SUPPORTED_READERS[self.reader.get()])
         voxel_size: tuple[float, float] = self.vs_xy.get(), self.vs_z.get()
         img.setVoxelSize(voxel_size)
 
@@ -340,14 +355,42 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
         imgId = removeExt(newFileName)
         img.setImgId(imgId)
 
-        createAbsLink(os.path.abspath(file_path), os.path.abspath(self._getExtraPath(newFileName)))
+        createAbsLink(
+            os.path.abspath(file_path), os.path.abspath(self._getExtraPath(newFileName))
+        )
 
         img.cleanObjId()
         img.setFileName(self._getExtraPath(newFileName))
 
         self._defineOutputs(**{self.OUTPUT_NAME: img})
-    
 
+    def loadAcquisitionInfo(self):
+        """Return a proper acquisitionInfo (dict)
+        or an error message (str).
+        """
+        voxel_sizes: dict[str, list[float | pint.Quantity]] = {
+            "x": [],
+            "y": [],
+            "z": [],
+        }
+        fname = self.filePath.get()
+        if fname:
+            im = AICSImage(fname, reader=self.getReader())
+            try:
+                pixels = im.ome_metadata.images[0].pixels
+                for d in "xyz":
+                    attr_d = f"physical_size_{d}"
+                    if getattr(pixels, attr_d + "_quantity", None):
+                        voxel_sizes[d].append(
+                            getattr(pixels, attr_d + "_quantity")
+                        )  # returns a pint.Quantity
+                    elif getattr(pixels, attr_d) is not None:
+                        voxel_sizes[d].append(getattr(pixels, attr_d))  # float
+            except NotImplementedError:
+                pass
+        for k in voxel_sizes:
+            voxel_sizes[k] = list(set(voxel_sizes[k]))
+        return voxel_sizes
 
     # --------------------------- INFO functions ------------------------------
     def _summary(self) -> List[str]:
@@ -369,7 +412,9 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
     def _getVolumeFileName(self, fileName: str, extension: Optional[str] = None) -> str:
         if extension is not None:
             baseFileName = (
-                "import_" + str(os.path.basename(fileName)).split(".")[0] + ".%s" % extension
+                "import_"
+                + str(os.path.basename(fileName)).split(".")[0]
+                + ".%s" % extension
             )
         else:
             baseFileName = "import_" + str(os.path.basename(fileName)).split(":")[0]

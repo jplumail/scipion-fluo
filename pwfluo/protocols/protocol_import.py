@@ -1,16 +1,7 @@
 # coding=utf-8
 
-import os
-import re
-from os.path import abspath, basename
-from typing import List, Optional, Tuple
 
-import pyworkflow.protocol.params as params
-from aicsimageio import AICSImage
 from pyworkflow import BETA
-from pyworkflow import utils as pwutils
-from pyworkflow.protocol.params import Form
-from pyworkflow.utils.path import createAbsLink, removeExt
 
 from pwfluo.objects import (
     FluoImage,
@@ -18,7 +9,6 @@ from pwfluo.objects import (
     PSFModel,
     SetOfFluoImages,
     SetOfParticles,
-    Transform,
 )
 from pwfluo.protocols.protocol_base import ProtFluoImportFile, ProtFluoImportFiles
 
@@ -38,7 +28,7 @@ class ProtImportFluoImages(ProtFluoImportFiles):
             self.importStep,
             FluoImage,
         )
-    
+
     def _getMessage(self) -> str:
         return "FluoImages %s" % self.getObjectTag(self.OUTPUT_NAME)
 
