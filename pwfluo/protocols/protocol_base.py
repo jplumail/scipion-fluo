@@ -24,7 +24,10 @@
 # *
 # **************************************************************************
 
-from typing import List, Type, TypeVar
+import os
+import re
+from typing import List, Optional, Tuple, Type, TypeVar
+import pint
 
 import pyworkflow as pw
 from pyworkflow.mapper.sqlite_db import SqliteDb
@@ -35,17 +38,30 @@ from pyworkflow.protocol.params import (
     Form,
     PointerParam,
 )
+from pyworkflow import utils as pwutils
 from pyworkflow.utils.properties import Message
+import pyworkflow.protocol.params as params
+from pyworkflow.utils.path import createAbsLink, removeExt
+from aicsimageio import AICSImage
+from aicsimageio.readers.default_reader import DefaultReader
 
 import pwfluo.objects as pwfluoobj
 from pwfluo.protocols.import_ import ProtImport, ProtImportFile, ProtImportFiles
+
+
+def _getUniqueFileName(pattern, filename, filePaths=None):
+    if filePaths is None:
+        filePaths = [re.split(r"[$*#?]", pattern)[0]]
+
+    commPath = pwutils.commonPath(filePaths)
+    return filename.replace(commPath + "/", "").replace("/", "_")
 
 
 class ProtFluoBase:
     T = TypeVar("T", bound=Set)
     OUTPUT_PREFIX: str
 
-    def _createSet(self, SetClass: Type[T], template, suffix, **kwargs) -> T:
+    def _createSet(self, SetClass: Type[T], template, suffix, **kwargs):
         """Create a set and set the filename using the suffix.
         If the file exists, it will be deleted."""
         setFn = self._getPath(template % suffix)
@@ -57,10 +73,8 @@ class ProtFluoBase:
         setObj = SetClass(filename=setFn, **kwargs)
         return setObj
 
-    def _createSetOfCoordinates3D(
-        self, volSet: pwfluoobj.SetOfFluoImages, suffix: str = ""
-    ) -> pwfluoobj.SetOfCoordinates3D:
-        coord3DSet: pwfluoobj.SetOfCoordinates3D = self._createSet(
+    def _createSetOfCoordinates3D(self, volSet: pwfluoobj.SetOfFluoImages, suffix: str = ""):
+        coord3DSet = self._createSet(
             pwfluoobj.SetOfCoordinates3D,
             "coordinates%s.sqlite",
             suffix,
@@ -69,13 +83,13 @@ class ProtFluoBase:
         coord3DSet.setPrecedents(volSet)
         return coord3DSet
 
-    def _createSetOfFluoImages(self, suffix: str = "") -> pwfluoobj.SetOfFluoImages:
+    def _createSetOfFluoImages(self, suffix: str = ""):
         return self._createSet(pwfluoobj.SetOfFluoImages, "fluoimages%s.sqlite", suffix)
 
-    def _createSetOfParticles(self, suffix: str = "") -> pwfluoobj.SetOfParticles:
+    def _createSetOfParticles(self, suffix: str = ""):
         return self._createSet(pwfluoobj.SetOfParticles, "particles%s.sqlite", suffix)
 
-    def _getOutputSuffix(self, cls: type) -> str:
+    def _getOutputSuffix(self, cls: type):
         """Get the name to be used for a new output.
         For example: output3DCoordinates7.
         It should take into account previous outputs
@@ -119,17 +133,122 @@ class ProtFluoPicking(ProtImport, ProtFluoBase):
         return summary
 
 
-class ProtFluoImportFiles(ProtImportFiles, ProtFluoBase):
+class ProtFluoImportBase(ProtFluoBase):
+    READERS = list(map(lambda x: getattr(x, "__name__"), AICSImage.SUPPORTED_READERS))
+    T = TypeVar("T", bound=pwfluoobj.FluoImage)
+    S = TypeVar("S", bound=Set)
+
+    def __init__(self):
+        self.images = None
+    
     def _defineAcquisitionParams(self, form: Form) -> None:
         """Override to add options related to acquisition info."""
         form.addGroup("Voxel size")
         form.addParam("vs_xy", FloatParam, label="XY (μm/px)")
         form.addParam("vs_z", FloatParam, label="Z (μm/px)")
+    
+    def _defineImportParams(self, form: Form) -> None:
+        form.addParam(
+            "reader",
+            params.EnumParam,
+            choices=self.READERS,
+            display=params.EnumParam.DISPLAY_COMBO,
+            label="Reader",
+            help="Choose the reader"
+            "The DefaultReader finds a reader that works for your image."
+            "BioformatsReader corresponds to the ImageJ reader"
+            "(requires java and maven to be installed)",
+        )
 
-    def _validate(self):
-        pass
+    # --------------------------- INFO functions ------------------------------
+    def _getMessage(self) -> str:
+        return ''
+
+    def _hasOutput(self):
+        return self.images is not None
+
+    def _methods(self) -> List[str]:
+        methods = []
+        if self._hasOutput():
+            vs_xy, vs_z = self.vs_xy.get(), self.vs_z.get()
+            methods.append(
+                f"{self._getMessage()} imported with a voxel size "
+                f"*{vs_xy:.2f}x{vs_z:.2f}* (μm/px)"
+            )
+        return methods
 
 
+class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
+    READERS = list(map(lambda x: getattr(x, "__name__"), AICSImage.SUPPORTED_READERS))
+    T = TypeVar("T", bound=pwfluoobj.FluoImage)
+    S = TypeVar("S", bound=Set)
+
+    def __init__(self, **args):
+        ProtImportFiles.__init__(self, **args)
+        ProtFluoImportBase.__init__(self)
+    
+    def importStep(self, obj: Type[T]):
+        """Copy images matching the filename pattern
+        Register other parameters.
+        """
+        pattern = self.getPattern()
+        self.info("Using pattern: '%s'" % pattern)
+
+        if obj is pwfluoobj.FluoImage:
+            imgSet = self._createSetOfFluoImages()
+        elif obj is pwfluoobj.Particle:
+            imgSet = self._createSetOfParticles()
+        else:
+            raise NotImplementedError()
+        voxel_size: tuple[float, float] = self.vs_xy.get(), self.vs_z.get()
+        imgSet.setVoxelSize(voxel_size)
+
+        fileNameList = []
+        for fileName, fileId in self.iterFiles():
+            img = obj(
+                data=fileName, reader=self.getReader()
+            )
+            img.setVoxelSize(voxel_size)
+
+            # Set default origin
+            origin = pwfluoobj.Transform()
+            dim = img.getDim()
+            if dim is None:
+                raise ValueError("Image '%s' has no dimension" % fileName)
+            x, y, z = dim
+            origin.setShifts(
+                x / -2.0 * voxel_size[0],
+                y / -2.0 * voxel_size[0],
+                z / -2.0 * voxel_size[1],
+            )
+            img.setOrigin(origin)
+
+            newFileName = os.path.basename(fileName).split(":")[0]
+            if newFileName in fileNameList:
+                newFileName = _getUniqueFileName(
+                    self.getPattern(), fileName.split(":")[0]
+                )
+
+            fileNameList.append(newFileName)
+
+            imgId = removeExt(newFileName)
+            img.setImgId(imgId)
+
+            createAbsLink(os.path.abspath(fileName), os.path.abspath(self._getExtraPath(newFileName)))
+
+            img.cleanObjId()
+            img.setFileName(self._getExtraPath(newFileName))
+            imgSet.append(img)
+
+        imgSet.write()
+        self._defineOutputs(**{self.OUTPUT_NAME: imgSet})
+    
+    def getReader(self):
+        if self.reader.get() is not None:
+            return AICSImage.SUPPORTED_READERS[self.reader.get()]
+        else:
+            return DefaultReader
+    
 class ProtFluoImportFile(
     ProtImportFile, ProtFluoBase
 ):  # TODO: find a better architecture
@@ -143,7 +262,126 @@ class ProtFluoImportFile(
         pass
 
 
-class ProtFluoParticleAveraging(Protocol, ProtFluoBase):
-    """Base class for subtomogram averaging protocols."""
 
-    pass
+    # --------------------------- INFO functions ------------------------------
+    def _summary(self) -> List[str]:
+        try:
+            summary = []
+            if self._hasOutput():
+                summary.append(
+                    "%s imported from:\n%s" % (self._getMessage(), self.getPattern())
+                )
+
+                if (vs_xy := self.vs_xy.get()) and (vs_z := self.vs_z.get()):
+                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (μm/px)")
+
+        except Exception as e:
+            print(e)
+
+        return summary
+
+    def _getVolumeFileName(self, fileName: str, extension: Optional[str] = None) -> str:
+        if extension is not None:
+            baseFileName = (
+                "import_" + str(os.path.basename(fileName)).split(".")[0] + ".%s" % extension
+            )
+        else:
+            baseFileName = "import_" + str(os.path.basename(fileName)).split(":")[0]
+
+        return self._getExtraPath(baseFileName)
+
+    def _validate(self) -> List[str]:
+        errors = []
+        try:
+            next(self.iterFiles())
+        except StopIteration:
+            errors.append(
+                "No files matching the pattern %s were found." % self.getPattern()
+            )
+        return errors
+
+
+class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
+    READERS = list(map(lambda x: getattr(x, "__name__"), AICSImage.SUPPORTED_READERS))
+    T = TypeVar("T", bound=pwfluoobj.FluoImage)
+
+    def __init__(self, **args):
+        ProtFluoImportBase.__init__(self)
+        ProtImportFile.__init__(self, **args)
+    
+    def importImageStep(self, obj: type[T]) -> None:
+        """Copy the file.
+        Register other parameters.
+        """
+        self.info("")
+
+        file_path = self.filePath.get()
+        img = obj(
+            data=file_path, reader=AICSImage.SUPPORTED_READERS[self.reader.get()]
+        )
+        voxel_size: tuple[float, float] = self.vs_xy.get(), self.vs_z.get()
+        img.setVoxelSize(voxel_size)
+
+        # Set default origin
+        origin = pwfluoobj.Transform()
+        dim = img.getDim()
+        if dim is None:
+            raise ValueError("Image '%s' has no dimension" % file_path)
+        x, y, z = dim
+        origin.setShifts(
+            x / -2.0 * voxel_size[0],
+            y / -2.0 * voxel_size[0],
+            z / -2.0 * voxel_size[1],
+        )
+        img.setOrigin(origin)
+
+        newFileName = os.path.basename(file_path)
+
+        imgId = removeExt(newFileName)
+        img.setImgId(imgId)
+
+        createAbsLink(os.path.abspath(file_path), os.path.abspath(self._getExtraPath(newFileName)))
+
+        img.cleanObjId()
+        img.setFileName(self._getExtraPath(newFileName))
+
+        self._defineOutputs(**{self.OUTPUT_NAME: img})
+    
+
+
+    # --------------------------- INFO functions ------------------------------
+    def _summary(self) -> List[str]:
+        try:
+            summary = []
+            if self._hasOutput():
+                summary.append(
+                    "%s imported from:\n%s" % (self._getMessage(), self.getPattern())
+                )
+
+                if (vs_xy := self.vs_xy.get()) and (vs_z := self.vs_z.get()):
+                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (μm/px)")
+
+        except Exception as e:
+            print(e)
+
+        return summary
+
+    def _getVolumeFileName(self, fileName: str, extension: Optional[str] = None) -> str:
+        if extension is not None:
+            baseFileName = (
+                "import_" + str(os.path.basename(fileName)).split(".")[0] + ".%s" % extension
+            )
+        else:
+            baseFileName = "import_" + str(os.path.basename(fileName)).split(":")[0]
+
+        return self._getExtraPath(baseFileName)
+
+    def _validate(self) -> List[str]:
+        errors = []
+        try:
+            next(self.iterFiles())
+        except StopIteration:
+            errors.append(
+                "No files matching the pattern %s were found." % self.getPattern()
+            )
+        return errors
