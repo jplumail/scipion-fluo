@@ -29,7 +29,7 @@ class ImportAcquisitionWizard(FluoWizard):
                 for vs, name, attr in [(vs_xy, "XY", "vs_xy"), (vs_z, "Z", "vs_z")]:
                     if len(vs) == 0:
                         msg = f"{name} no voxel size found.\n"
-                        # dialog.showInfo(f"Voxel size {name}", msg, form.root)
+                        dialog.showInfo(f"Voxel size {name}", msg, form.root)
                     elif len(vs) > 1:
                         msg = f"{name} found multiple values:\n"
                         for vs_ in vs:
@@ -37,23 +37,12 @@ class ImportAcquisitionWizard(FluoWizard):
                                 msg += f"\t{name} voxel size: {vs_.to('um'):.3f}\n"
                             else:
                                 msg += f"\t{name} voxel size: {vs_} (no unit)\n"
-                        # dialog.showInfo(f"Voxel size {name}", msg, form.root)
+                        dialog.showInfo(f"Voxel size {name}", msg, form.root)
                     else:
                         v = vs[0]
                         if isinstance(v, pint.Quantity):
-                            v = v.to("um")
-                            msg = f"{name} voxel size: {v:.3f}\n"
-                            v = v.magnitude
-                        else:
-                            msg = f"{name} voxel size: {vs[0]} (no unit)\n"
-                        msg += "\n*Do you want to use detected voxel size values?*"
-                        comment = ""
-                        if prot.hasAttribute(attr):
-                            form.setVar(attr, v)
-                        else:
-                            comment += "%s = %s\n" % (attr, v)
-                        if comment:
-                            prot.setObjComment(comment)
+                            v = v.to("um").magnitude
+                        form.setVar(attr, v)
 
             # Fill transpose T<>Z axes
             problematic_images = []
