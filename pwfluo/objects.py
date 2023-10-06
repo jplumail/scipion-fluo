@@ -367,10 +367,6 @@ class Image(FluoObject):
 
     @property
     def img(self) -> Optional[AICSImage]:
-        if (
-            self._img is None and (fname := self.getFileName()) is not None
-        ):  # if data was not set, but filename present
-            self.img = Image.read(fname, reader=self.reader)
         return self._img
 
     @img.setter
