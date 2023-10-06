@@ -1,4 +1,0 @@
-scipion-pyworkflow
-scipy
-numpy
-aicsimageio

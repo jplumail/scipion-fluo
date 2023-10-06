@@ -1,6 +1,37 @@
 [build-system]
-requires = ["setuptools >= 40.6.0", "wheel"]
+requires = [
+    "setuptools >= 60",
+    "setuptools-scm[toml]>=8.0"
+]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "scipion-fluo"
+description = "Base pyworkflow plugin for Fluorescence image processing"
+readme = "README.rst"
+authors = [{name = "Jean Plumail", email = "jplumail@unistra.fr"}]
+keywords = ["scipion", "fluorescence", "imageprocessing", "scipion-3.0"]
+dynamic = ["version"]
+dependencies = [
+    "scipion-pyworkflow",
+    "scipy",
+    "numpy",
+    "aicsimageio",
+]
+
+[project.urls]
+Repository = "https://github.com/jplumail/scipion-fluo"
+
+[tool.setuptools_scm]
+
+[project.optional-dependencies]
+dev = ["ruff", "black", "pre-commit"]
+
+[project.scripts]
+scipion-fluo = "pwfluo.__main__:main"
+
+[project.entry-points."pyworkflow.plugin"]
+pwfluo = "pwfluo"
 
 [tool.ruff]
 select = [
