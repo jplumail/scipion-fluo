@@ -20,7 +20,9 @@ class ImportAcquisitionWizard(FluoWizard):
     def show(cls, form: FormWindow, *params):
         try:
             prot = form.protocol  # type: ProtFluoImportFiles | ProtFluoImportFile
-            voxel_sizes = prot.loadAcquisitionInfo()
+            voxel_sizes, dims = prot.load_image_info()
+
+            # Fill voxel size boxes
             vs_xy = list(set(voxel_sizes["x"] + voxel_sizes["y"]))
             vs_z = list(set(voxel_sizes["z"]))
             if not (len(vs_xy) == 0 and len(vs_z) == 0):
@@ -52,6 +54,29 @@ class ImportAcquisitionWizard(FluoWizard):
                             comment += "%s = %s\n" % (attr, v)
                         if comment:
                             prot.setObjComment(comment)
+
+            # Fill transpose T<>Z axes
+            problematic_images = []
+            for fname in dims:
+                dim = dims[fname]
+                if dim.Z == 1 and dim.T > 1:
+                    problematic_images.append(fname)
+            if len(problematic_images) > 0:
+                msg = f"Found {'files' if len(problematic_images)>1 else 'a file'} "
+                "with a temporal dimension greater than 1, "
+                "and Z dimension equal to 1:\n"
+                for fname in problematic_images:
+                    msg += "\t" + f"{fname}: {dims[fname]}" + "\n"
+                msg += "\n*Do you want to transpose the T and Z axes for "
+                msg += (
+                    "these images?*" if len(problematic_images) > 1 else "this image?*"
+                )
+                msg += "\n"
+                response = dialog.askYesNo("transpose axes?", msg, form.root)
+                if response:
+                    form.setVar("transpose_tz", True)
+                else:
+                    form.setVar("transpose_tz", False)
 
         except FileNotFoundError as e:
             dialog.showInfo(

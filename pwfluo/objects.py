@@ -36,6 +36,7 @@ import pyworkflow.object as pwobj
 # type: ignore
 import pyworkflow.utils as pwutils  # type: ignore
 from aicsimageio import AICSImage
+from aicsimageio.readers.ome_tiff_reader import OmeTiffReader
 from aicsimageio.readers.reader import Reader
 from aicsimageio.types import ImageLike, PathLike
 from aicsimageio.writers.ome_tiff_writer import OmeTiffWriter
@@ -378,24 +379,19 @@ class Image(FluoObject):
         if self.img is not None:  # image data exists, meaning img arg was not None
             d = self.img.dims
             x, y, z = d.X, d.Y, d.Z
-            if d.T > 1:
-                if d.Z == 1:  # reshape data T <> Z
-                    print("WARNING: REWRITING THE IMAGE")
-                    new_path = self.getFileName()
-                    OmeTiffWriter.save(
-                        data=self.img.data.transpose(2, 1, 0, 3, 4),
-                        uri=new_path,
-                        physical_pixel_sizes=self.img.physical_pixel_sizes,
-                    )
-                    self.setFileName(new_path)  # re-enter the setter func
-                else:
-                    raise ValueError(
-                        f"{img} is a serie of images. Dims is {self.img.dims}."
-                        "Should be one image."
-                    )
-            else:
-                self._imageDim.set_((x, y, z))
-                self._num_channels.set(d.C)
+            self._imageDim.set_((x, y, z))
+            self._num_channels.set(d.C)
+
+    def transposeTZ(self):
+        """Use with precaution, will rewrite the image"""
+        new_path = self.getFileName()
+        OmeTiffWriter.save(
+            data=self.img.data.transpose(2, 1, 0, 3, 4),
+            uri=new_path,
+            physical_pixel_sizes=self.img.physical_pixel_sizes,
+        )
+        self.reader = OmeTiffReader
+        self.setFileName(new_path)  # re-enter the setter func
 
     def getData(self) -> Union[NDArray, None]:
         if self.img is not None:

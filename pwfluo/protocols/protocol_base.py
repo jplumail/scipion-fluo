@@ -32,6 +32,7 @@ import pint
 import pyworkflow as pw
 import pyworkflow.protocol.params as params
 from aicsimageio import AICSImage
+from aicsimageio.dimensions import Dimensions
 from aicsimageio.readers.default_reader import DefaultReader
 from pyworkflow import utils as pwutils
 from pyworkflow.mapper.sqlite_db import SqliteDb
@@ -148,12 +149,19 @@ class ProtFluoImportBase(ProtFluoBase):
             params.LabelParam,
             important=True,
             label="Use the wizard button to import parameters.",
-            help="Depending on the import format, "
-            "the wizard will try to import image parameters.\n"
+            help="The wizard will try to import image parameters "
+            "using the Reader above.\n"
             "If not found, required ones should be provided.",
         )
         group.addParam("vs_xy", FloatParam, label="XY (μm/px)")
         group.addParam("vs_z", FloatParam, label="Z (μm/px)")
+        group.addParam(
+            "transpose_tz",
+            params.BooleanParam,
+            default=True,
+            label="transpose T<>Z axes when possible?",
+            help="Will transpose T<>Z when Z=1 and T>1.",
+        )
 
     def _defineImportParams(self, form: Form) -> None:
         form.addParam(
@@ -167,6 +175,12 @@ class ProtFluoImportBase(ProtFluoBase):
             "BioformatsReader corresponds to the ImageJ reader"
             "(requires java and maven to be installed)",
         )
+
+    def getReader(self):
+        if self.reader.get() is not None:
+            return AICSImage.SUPPORTED_READERS[self.reader.get()]
+        else:
+            return DefaultReader
 
     # --------------------------- INFO functions ------------------------------
     def _getMessage(self) -> str:
@@ -245,18 +259,15 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
 
             img.cleanObjId()
             img.setFileName(self._getExtraPath(newFileName))
+            if img.img and self.transpose_tz.get():
+                if img.img.dims.T > 1 and img.img.dims.Z == 1:
+                    img.transposeTZ()
             imgSet.append(img)
 
         imgSet.write()
         self._defineOutputs(**{self.OUTPUT_NAME: imgSet})
 
-    def getReader(self):
-        if self.reader.get() is not None:
-            return AICSImage.SUPPORTED_READERS[self.reader.get()]
-        else:
-            return DefaultReader
-
-    def loadAcquisitionInfo(self):
+    def load_image_info(self):
         """Return a proper acquisitionInfo (dict)
         or an error message (str).
         """
@@ -265,8 +276,10 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
             "y": [],
             "z": [],
         }
+        dims: dict[str, Dimensions] = {}
         for fname, _ in self.iterFiles():
             im = AICSImage(fname, reader=self.getReader())
+            dims[os.path.basename(fname)] = im.dims
             try:
                 pixels = im.ome_metadata.images[0].pixels
                 for d in "xyz":
@@ -281,7 +294,7 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
                 pass
         for k in voxel_sizes:
             voxel_sizes[k] = list(set(voxel_sizes[k]))
-        return voxel_sizes
+        return voxel_sizes, dims
 
     # --------------------------- INFO functions ------------------------------
     def _summary(self) -> List[str]:
@@ -366,10 +379,13 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
 
         img.cleanObjId()
         img.setFileName(self._getExtraPath(newFileName))
+        if img.img and self.transpose_tz.get():
+            if img.img.dims.T > 1 and img.img.dims.Z == 1:
+                img.transposeTZ()
 
         self._defineOutputs(**{self.OUTPUT_NAME: img})
 
-    def loadAcquisitionInfo(self):
+    def load_image_info(self):
         """Return a proper acquisitionInfo (dict)
         or an error message (str).
         """
@@ -379,8 +395,10 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
             "z": [],
         }
         fname = self.filePath.get()
+        dims: dict[str, Dimensions] = {}
         if fname:
             im = AICSImage(fname, reader=self.getReader())
+            dims[fname] = im.dims
             try:
                 pixels = im.ome_metadata.images[0].pixels
                 for d in "xyz":
@@ -395,7 +413,7 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
                 pass
         for k in voxel_sizes:
             voxel_sizes[k] = list(set(voxel_sizes[k]))
-        return voxel_sizes
+        return voxel_sizes, dims
 
     # --------------------------- INFO functions ------------------------------
     def _summary(self) -> List[str]:
