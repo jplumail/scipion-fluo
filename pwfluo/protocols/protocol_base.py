@@ -33,7 +33,6 @@ import pyworkflow as pw
 import pyworkflow.protocol.params as params
 from aicsimageio import AICSImage
 from aicsimageio.dimensions import Dimensions
-from aicsimageio.readers.default_reader import DefaultReader
 from pyworkflow import utils as pwutils
 from pyworkflow.mapper.sqlite_db import SqliteDb
 from pyworkflow.object import Set
@@ -47,6 +46,11 @@ from pyworkflow.utils.properties import Message
 
 import pwfluo.objects as pwfluoobj
 from pwfluo.protocols.import_ import ProtImport, ProtImportFile, ProtImportFiles
+
+READERS = {}
+READERS["Automatic"] = None
+READERS.update({getattr(r, "__name__"): r for r in AICSImage.SUPPORTED_READERS})
+READERS_KEYS = list(READERS.keys())
 
 
 def _getUniqueFileName(pattern, filename, filePaths=None):
@@ -136,8 +140,6 @@ class ProtFluoPicking(ProtImport, ProtFluoBase):
 
 
 class ProtFluoImportBase(ProtFluoBase):
-    READERS = list(map(lambda x: getattr(x, "__name__"), AICSImage.SUPPORTED_READERS))
-
     def __init__(self):
         self.images = None
 
@@ -167,7 +169,7 @@ class ProtFluoImportBase(ProtFluoBase):
         form.addParam(
             "reader",
             params.EnumParam,
-            choices=self.READERS,
+            choices=READERS_KEYS,
             display=params.EnumParam.DISPLAY_COMBO,
             label="Reader",
             help="Choose the reader"
@@ -178,9 +180,9 @@ class ProtFluoImportBase(ProtFluoBase):
 
     def getReader(self):
         if self.reader.get() is not None:
-            return AICSImage.SUPPORTED_READERS[self.reader.get()]
+            return READERS[READERS_KEYS[self.reader.get()]]
         else:
-            return DefaultReader
+            return READERS["Automatic"]
 
     # --------------------------- INFO functions ------------------------------
     def _getMessage(self) -> str:
@@ -337,7 +339,6 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
 
 
 class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
-    READERS = list(map(lambda x: getattr(x, "__name__"), AICSImage.SUPPORTED_READERS))
     T = TypeVar("T", bound=pwfluoobj.FluoImage)
 
     def __init__(self, **args):
@@ -351,7 +352,7 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
         self.info("")
 
         file_path = self.filePath.get()
-        img = obj(data=file_path, reader=AICSImage.SUPPORTED_READERS[self.reader.get()])
+        img = obj(data=file_path, reader=self.getReader())
         voxel_size: tuple[float, float] = self.vs_xy.get(), self.vs_z.get()
         img.setVoxelSize(voxel_size)
 
