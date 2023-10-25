@@ -339,7 +339,7 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
 
 
 class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
-    T = TypeVar("T", bound=pwfluoobj.FluoImage)
+    T = TypeVar("T", bound=pwfluoobj.Image)
 
     def __init__(self, **args):
         ProtFluoImportBase.__init__(self)
@@ -372,7 +372,10 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
         newFileName = os.path.basename(file_path)
 
         imgId = removeExt(newFileName)
-        img.setImgId(imgId)
+        if isinstance(img, pwfluoobj.FluoImage):
+            img.setImgId(imgId)
+        else:
+            img.setObjId(imgId)
 
         createAbsLink(
             os.path.abspath(file_path), os.path.abspath(self._getExtraPath(newFileName))
@@ -444,13 +447,3 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
             baseFileName = "import_" + str(os.path.basename(fileName)).split(":")[0]
 
         return self._getExtraPath(baseFileName)
-
-    def _validate(self) -> List[str]:
-        errors = []
-        try:
-            next(self.iterFiles())
-        except StopIteration:
-            errors.append(
-                "No files matching the pattern %s were found." % self.getPattern()
-            )
-        return errors
