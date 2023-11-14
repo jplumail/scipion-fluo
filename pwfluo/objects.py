@@ -367,13 +367,15 @@ class Image(FluoObject):
 
     @property
     def img(self) -> Optional[AICSImage]:
+        if self._img is None and self.getFileName():
+            self.setFileName(self.getFileName())
         return self._img
 
     @img.setter
     def img(self, img: Optional[AICSImage]) -> None:
         self._img = img
-        if self.img is not None:  # image data exists, meaning img arg was not None
-            d = self.img.dims
+        if img is not None:
+            d = img.dims
             x, y, z = d.X, d.Y, d.Z
             self._imageDim.set_((x, y, z))
             self._num_channels.set(d.C)
@@ -399,7 +401,7 @@ class Image(FluoObject):
         return self.img is None
 
     def getVoxelSize(self) -> Optional[Tuple[float, float]]:
-        """Return image voxel size. (A/pix)"""
+        """Return image voxel size. (µm/pix)"""
         return self._voxelSize.getVoxelSize()
 
     def setVoxelSize(self, voxel_size: Tuple[float, float]) -> None:
@@ -409,7 +411,7 @@ class Image(FluoObject):
         pass
 
     def getDataType(self):
-        pass
+        return self.img.dtype
 
     def getDimensions(self) -> Optional[Tuple[int, int, int]]:
         """getDimensions is redundant here but not in setOfImages
