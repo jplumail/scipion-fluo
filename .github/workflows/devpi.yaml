@@ -24,7 +24,7 @@ jobs:
 
     - name: Authenticate and upload to devpi
       run: |
-        devpi use http://vps-429048d2.vps.ovh.net
+        devpi use http://spfluo.ovh
         devpi login jean --password=${{ secrets.DEVPI_PASSWORD }}
         devpi use jean/dev
         devpi upload
