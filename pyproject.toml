@@ -16,7 +16,7 @@ dependencies = [
     "scipion-pyworkflow",
     "scipy",
     "numpy",
-    "aicsimageio",
+    "aicsimageio[base-imageio]",
 ]
 
 [project.urls]
