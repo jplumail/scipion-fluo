@@ -31,17 +31,14 @@ import typing
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
+import pint
 import pyworkflow.object as pwobj
 
 # type: ignore
 import pyworkflow.utils as pwutils  # type: ignore
-from aicsimageio import AICSImage
-from aicsimageio.readers.ome_tiff_reader import OmeTiffReader
-from aicsimageio.readers.reader import Reader
-from aicsimageio.types import ImageLike, PathLike
-from aicsimageio.writers.ome_tiff_writer import OmeTiffWriter
+import tifffile  # type: ignore
 from numpy.typing import NDArray
-from ome_types import OME
+from ome_types import from_xml
 from pyworkflow.object import (
     CsvList,
     Integer,
@@ -51,7 +48,6 @@ from pyworkflow.object import (
     Set,
     String,
 )
-from scipy.ndimage import affine_transform  # type: ignore
 
 
 class FluoObject(pwobj.Object):
@@ -319,13 +315,160 @@ class VoxelSize(CsvList, FluoObject):
         return s
 
 
+# Taken from https://github.com/4DNucleome/PartSeg/blob/develop/package/PartSegImage/image_reader.py
+name_to_scalar = {
+    "micron": 10**-6,
+    "µm": 10**-6,
+    "um": 10**-6,
+    "nm": 10**-9,
+    "mm": 10**-3,
+    "millimeter": 10**-3,
+    "pm": 10**-12,
+    "picometer": 100**-12,
+    "nanometer": 10**-9,
+    "\\u00B5m": 10**-6,
+    "centimeter": 10**-2,
+    "cm": 10**-2,
+    "cal": 2.54 * 10**-2,
+}  #: dict with known names of scalar to scalar value. Some may be  missed
+
+
+def read_resolution_from_tags(
+    image_file: tifffile.TiffFile,
+) -> tuple[float | None, float | None]:
+    tags = image_file.pages[0].tags
+    try:
+        if image_file.is_imagej:
+            scalar = name_to_scalar[image_file.imagej_metadata["unit"]]
+        else:
+            unit = tags["ResolutionUnit"].value
+            if unit == 3:
+                scalar = name_to_scalar["centimeter"]
+            elif unit == 2:
+                scalar = name_to_scalar["cal"]
+            else:  # pragma: no cover
+                raise KeyError(
+                    f"wrong scalar {tags['ResolutionUnit']}, "
+                    f"{tags['ResolutionUnit'].value}"
+                )
+
+        x_spacing = tags["XResolution"].value[1] / tags["XResolution"].value[0] * scalar
+        y_spacing = tags["YResolution"].value[1] / tags["YResolution"].value[0] * scalar
+    except (KeyError, ZeroDivisionError):
+        x_spacing, y_spacing = None, None
+    return x_spacing, y_spacing
+
+
+def read_imagej_metadata(image_file: tifffile.TiffFile):
+    try:
+        z_spacing = (
+            image_file.imagej_metadata["spacing"]
+            * name_to_scalar[image_file.imagej_metadata["unit"]]
+        )
+    except KeyError:
+        z_spacing = None
+    x_spacing, y_spacing = read_resolution_from_tags(image_file)
+    if x_spacing != y_spacing:
+        x_spacing = None
+
+    return x_spacing, z_spacing
+
+
 class Image(FluoObject):
     """Represents an image object"""
 
+    @classmethod
+    def metadata_from_filename(cls, filename: str):
+        with tifffile.TiffFile(filename) as tif:
+            if tif.is_ome:
+                ome = from_xml(tif.pages[0].tags["ImageDescription"].value)
+                pixels = ome.images[0].pixels
+                voxel_sizes: dict[str, float] = {}
+                for d in "xyz":
+                    attr_d = f"physical_size_{d}_quantity"
+                    px_size: pint.Quantity = getattr(pixels, attr_d, None)
+                    voxel_sizes[d] = px_size.to("um").magnitude if px_size else None
+                assert voxel_sizes["x"] == voxel_sizes["y"]
+                voxel_size = voxel_sizes["x"], voxel_sizes["z"]
+                image_dim = (pixels.size_x, pixels.size_y, pixels.size_z)
+                num_channels = pixels.size_c
+            else:
+                tags = tif.pages[0].tags
+                size_x, size_y = tags["ImageWidth"].value, tags["ImageLength"].value
+                # Read resolution from tags
+                if tif.is_imagej:
+                    xy_spacing, z_spacing = read_imagej_metadata(tif)
+                    num_channels = tif.imagej_metadata.get("channels", 1)
+                    if "slices" in tif.imagej_metadata:
+                        size_z = tif.imagej_metadata["slices"]
+                    elif "frames" in tif.imagej_metadata:
+                        size_z = tif.imagej_metadata["frames"]
+                    else:
+                        size_z = None
+                else:
+                    xy_spacing, _ = read_resolution_from_tags(tif)
+                    z_spacing = None
+                    num_channels = None
+                    size_z = len(tif.pages)
+
+                voxel_size = (xy_spacing, z_spacing)
+                image_dim = (size_x, size_y, size_z)
+
+        return dict(
+            voxel_size=voxel_size,
+            image_dim=image_dim,
+            num_channels=num_channels,
+        )
+
+    @classmethod
+    def from_data(cls, data: np.ndarray, filename: str, **kwargs):
+        """Create an Image from a ndarray. Will write the data to filename.
+        data: ndarray of shape (C, Z, Y, X)
+        filename: path to file to write
+        kwargs: voxel_size, image_dim
+        """
+        if "image_dim" in kwargs and kwargs.get("image_dim")[::-1] != data.shape[1:]:
+            raise ValueError(
+                f"Data shape {data.shape[1:]} != {kwargs.get('image_dim')[::-1]}"
+            )
+        kwargs["image_dim"] = data.shape[:0:-1]
+        if not filename.endswith(".ome.tiff"):
+            raise ValueError(
+                f"Filename should have .ome.tiff extension, got {filename}"
+            )
+        metadata = {"axes": "CZYX"}
+        if "voxel_size" in kwargs:
+            metadata.update(
+                {
+                    "PhysicalSizeX": kwargs.get("voxel_size")[0],
+                    "PhysicalSizeY": kwargs.get("voxel_size")[0],
+                    "PhysicalSizeZ": kwargs.get("voxel_size")[1],
+                    "PhysicalSizeXUnit": "µm",
+                    "PhysicalSizeYUnit": "µm",
+                    "PhysicalSizeZUnit": "µm",
+                }
+            )
+        tifffile.imwrite(filename, data, metadata=metadata)
+        print(kwargs)
+        return cls(filename=filename, **kwargs)
+
+    @classmethod
+    def from_filename(cls, filename: str, **kwargs):
+        """Create an Image from a file. If metadata is found in the file,
+        will retrieve infos from it, like voxel size, image dim and num channels.
+        kwargs have higher priority than found metadata.
+        """
+        metadata = cls.metadata_from_filename(filename)
+        metadata.update(kwargs)  # kwargs have higher priority
+        return cls(filename=filename, **metadata)
+
     def __init__(
         self,
-        data: Optional[ImageLike] = None,
-        reader: Optional[Reader] = None,
+        filename: Optional[str] = None,
+        voxel_size: Optional[tuple[float, float]] = None,
+        transform: Optional[np.ndarray[Any, np.float64]] = None,
+        image_dim: Optional[tuple[int, int, int]] = None,
+        num_channels: Optional[int] = None,
         **kwargs,
     ) -> None:
         """
@@ -334,14 +477,16 @@ class Image(FluoObject):
         or  filename
         """
         FluoObject.__init__(self, **kwargs)
-        # Image location is composed by an index and a filename
-        self._filename: String = String()
-        self._img: Optional[AICSImage] = None
-        self._voxelSize: VoxelSize = VoxelSize()
+        if filename and not os.path.exists(filename):
+            raise FileNotFoundError(f"{filename} not found")
+        self._filename: String = String(filename)
+        self._voxelSize: VoxelSize = (
+            VoxelSize(*voxel_size) if voxel_size else VoxelSize()
+        )
         # _transform property will store the transformation matrix
         # this matrix can be used for 2D/3D alignment or
         # to represent projection directions
-        self._transform: Transform = Transform()
+        self._transform: Transform = Transform(transform)
         # default origin by default is box center =
         # (Xdim/2, Ydim/2,Zdim/2)*sampling
         # origin stores a matrix that using as input the point (0,0,0)
@@ -349,54 +494,29 @@ class Image(FluoObject):
         # coordinates of the default origin.
         # _origin is an object of the class Transform shifts
         # units are A.
-        self._origin: Transform = Transform()
-        self._imageDim: ImageDim = ImageDim()
-        self._num_channels: Integer = Integer()
-        self.reader = reader
-        if data is not None:
-            if isinstance(data, str):
-                self.setFileName(data)
-            else:
-                self.img = Image.read(data, reader=self.reader)
+        self._imageDim: ImageDim = ImageDim(*image_dim) if image_dim else ImageDim()
+        self._num_channels: Integer = Integer(num_channels)
 
-    @classmethod
-    def read(cls, img: ImageLike, reader: Optional[Reader] = None):
-        return AICSImage(img, reader=reader)
-
-    @property
-    def img(self) -> Optional[AICSImage]:
-        if self._img is None and self.getFileName():
-            self.setFileName(self.getFileName())
-        return self._img
-
-    @img.setter
-    def img(self, img: Optional[AICSImage]) -> None:
-        self._img = img
-        if img is not None:
-            d = img.dims
-            x, y, z = d.X, d.Y, d.Z
-            self._imageDim.set_((x, y, z))
-            self._num_channels.set(d.C)
-
-    def transposeTZ(self):
-        """Use with precaution, will rewrite the image"""
-        new_path = self.getFileName()
-        OmeTiffWriter.save(
-            data=self.img.data.transpose(2, 1, 0, 3, 4),
-            uri=new_path,
-            physical_pixel_sizes=self.img.physical_pixel_sizes,
-        )
-        self.reader = OmeTiffReader
-        self.setFileName(new_path)  # re-enter the setter func
-
-    def getData(self) -> Union[NDArray, None]:
-        if self.img is not None:
-            return self.img.data
-        else:
-            return None
+    def getData(self):
+        """Returns data in (C, Z, Y, X) shape"""
+        fname = self._filename.get()
+        if fname:
+            data = tifffile.imread(fname)
+            if data.ndim == 2:
+                return data[None, None]
+            elif data.ndim == 3:
+                if self.getNumChannels() and self.getNumChannels() > 1:
+                    return data[:, None]
+                else:
+                    return data[None, :]
+            elif data.ndim == 4:
+                if self.getNumChannels() and data.shape[0] == self.getNumChannels():
+                    return data
+                else:
+                    return np.transpose(data, (1, 0, 2, 3))
 
     def isEmpty(self):
-        return self.img is None
+        return self.getFileName() is None
 
     def getVoxelSize(self) -> Optional[Tuple[float, float]]:
         """Return image voxel size. (µm/pix)"""
@@ -436,7 +556,11 @@ class Image(FluoObject):
         return self._imageDim.getY()
 
     def getNumChannels(self) -> Union[int, None]:
-        return self._num_channels.get()
+        c = self._num_channels.get()
+        if c:
+            return c
+        else:
+            return 1
 
     def getFileName(self) -> Optional[str]:
         """Use the _objValue attribute to store filename."""
@@ -448,7 +572,6 @@ class Image(FluoObject):
     def setFileName(self, filename: str) -> None:
         """Use the _objValue attribute to store filename."""
         self._filename.set(filename)
-        self.img = Image.read(filename, reader=self.reader)
 
     def getBaseName(self) -> str:
         return os.path.basename(self.getFileName())
@@ -538,27 +661,6 @@ class Image(FluoObject):
 
     def getFiles(self) -> set:
         return set([self.getFileName()])
-
-    def build_ome(self, image_name: Optional[str] = None) -> OME:
-        return OmeTiffWriter.build_ome(
-            data_shapes=[self.img.shape],
-            data_types=[self.img.dtype],
-            dimension_order=[self.img.dims.order],
-            channel_names=[self.img.channel_names],
-            image_name=[image_name] if image_name else [None],
-            physical_pixel_sizes=[self.img.physical_pixel_sizes],
-            channel_colors=[None],
-        )
-
-    def save(self, path: PathLike, apply_transform: bool = False) -> None:
-        if self._img is None:
-            raise ValueError("Image is None.")
-        if apply_transform:
-            im_data = affine_transform(self.getData(), self.getTransform().getMatrix())
-        else:
-            im_data = self.getData()
-
-        OmeTiffWriter.save(data=im_data, uri=path, ome_xml=self.build_ome())
 
 
 class PSFModel(Image):
@@ -941,7 +1043,11 @@ class SetOfImages(FluoSet):
         Set.append(self, image)
 
     def getNumChannels(self) -> int:
-        return self._num_channels.get()
+        c = self._num_channels.get()
+        if c:
+            return c
+        else:
+            return 1
 
     def setNumChannels(self, c: int) -> None:
         self._num_channels.set(c)

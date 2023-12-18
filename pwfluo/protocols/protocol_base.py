@@ -28,11 +28,8 @@ import os
 import re
 from typing import List, Optional, Type, TypeVar
 
-import pint
 import pyworkflow as pw
 import pyworkflow.protocol.params as params
-from aicsimageio import AICSImage
-from aicsimageio.dimensions import Dimensions
 from pyworkflow import utils as pwutils
 from pyworkflow.mapper.sqlite_db import SqliteDb
 from pyworkflow.object import Set
@@ -46,11 +43,6 @@ from pyworkflow.utils.properties import Message
 
 import pwfluo.objects as pwfluoobj
 from pwfluo.protocols.import_ import ProtImport, ProtImportFile, ProtImportFiles
-
-READERS = {}
-READERS["Automatic"] = None
-READERS.update({getattr(r, "__name__"): r for r in AICSImage.SUPPORTED_READERS})
-READERS_KEYS = list(READERS.keys())
 
 
 def _getUniqueFileName(pattern, filename, filePaths=None):
@@ -151,38 +143,11 @@ class ProtFluoImportBase(ProtFluoBase):
             params.LabelParam,
             important=True,
             label="Use the wizard button to import parameters.",
-            help="The wizard will try to import image parameters "
-            "using the Reader above.\n"
+            help="The wizard will try to import image parameters.\n"
             "If not found, required ones should be provided.",
         )
         group.addParam("vs_xy", FloatParam, label="XY (μm/px)")
         group.addParam("vs_z", FloatParam, label="Z (μm/px)")
-        group.addParam(
-            "transpose_tz",
-            params.BooleanParam,
-            default=True,
-            label="transpose T<>Z axes when possible?",
-            help="Will transpose T<>Z when Z=1 and T>1.",
-        )
-
-    def _defineImportParams(self, form: Form) -> None:
-        form.addParam(
-            "reader",
-            params.EnumParam,
-            choices=READERS_KEYS,
-            display=params.EnumParam.DISPLAY_COMBO,
-            label="Reader",
-            help="Choose the reader"
-            "The DefaultReader finds a reader that works for your image."
-            "BioformatsReader corresponds to the ImageJ reader"
-            "(requires java and maven to be installed)",
-        )
-
-    def getReader(self):
-        if self.reader.get() is not None:
-            return READERS[READERS_KEYS[self.reader.get()]]
-        else:
-            return READERS["Automatic"]
 
     # --------------------------- INFO functions ------------------------------
     def _getMessage(self) -> str:
@@ -227,7 +192,7 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
 
         fileNameList = []
         for fileName, fileId in self.iterFiles():
-            img = obj(data=fileName, reader=self.getReader())
+            img = obj.from_filename(fileName)
             img.setVoxelSize(voxel_size)
 
             # Set default origin
@@ -261,9 +226,6 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
 
             img.cleanObjId()
             img.setFileName(self._getExtraPath(newFileName))
-            if img.img and self.transpose_tz.get():
-                if img.img.dims.T > 1 and img.img.dims.Z == 1:
-                    img.transposeTZ()
             imgSet.append(img)
 
         imgSet.write()
@@ -273,30 +235,13 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
         """Return a proper acquisitionInfo (dict)
         or an error message (str).
         """
-        voxel_sizes: dict[str, list[float | pint.Quantity]] = {
-            "x": [],
-            "y": [],
-            "z": [],
-        }
-        dims: dict[str, Dimensions] = {}
+        metadatas = dict(voxel_size=[], image_dim=[], num_channels=[], filename=[])
         for fname, _ in self.iterFiles():
-            im = AICSImage(fname, reader=self.getReader())
-            dims[os.path.basename(fname)] = im.dims
-            try:
-                pixels = im.ome_metadata.images[0].pixels
-                for d in "xyz":
-                    attr_d = f"physical_size_{d}"
-                    if getattr(pixels, attr_d + "_quantity", None):
-                        voxel_sizes[d].append(
-                            getattr(pixels, attr_d + "_quantity")
-                        )  # returns a pint.Quantity
-                    elif getattr(pixels, attr_d) is not None:
-                        voxel_sizes[d].append(getattr(pixels, attr_d))  # float
-            except NotImplementedError:
-                pass
-        for k in voxel_sizes:
-            voxel_sizes[k] = list(set(voxel_sizes[k]))
-        return voxel_sizes, dims
+            metadata = pwfluoobj.FluoImage.metadata_from_filename(fname)
+            metadatas["filename"].append(fname)
+            for k in metadata:
+                metadatas[k].append(metadata[k])
+        return metadatas
 
     # --------------------------- INFO functions ------------------------------
     def _summary(self) -> List[str]:
@@ -352,7 +297,7 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
         self.info("")
 
         file_path = self.filePath.get()
-        img = obj(data=file_path, reader=self.getReader())
+        img = obj.from_filename(file_path)
         voxel_size: tuple[float, float] = self.vs_xy.get(), self.vs_z.get()
         img.setVoxelSize(voxel_size)
 
@@ -383,9 +328,6 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
 
         img.cleanObjId()
         img.setFileName(self._getExtraPath(newFileName))
-        if img.img and self.transpose_tz.get():
-            if img.img.dims.T > 1 and img.img.dims.Z == 1:
-                img.transposeTZ()
 
         self._defineOutputs(**{self.OUTPUT_NAME: img})
 
@@ -393,31 +335,14 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
         """Return a proper acquisitionInfo (dict)
         or an error message (str).
         """
-        voxel_sizes: dict[str, list[float | pint.Quantity]] = {
-            "x": [],
-            "y": [],
-            "z": [],
-        }
         fname = self.filePath.get()
-        dims: dict[str, Dimensions] = {}
-        if fname:
-            im = AICSImage(fname, reader=self.getReader())
-            dims[fname] = im.dims
-            try:
-                pixels = im.ome_metadata.images[0].pixels
-                for d in "xyz":
-                    attr_d = f"physical_size_{d}"
-                    if getattr(pixels, attr_d + "_quantity", None):
-                        voxel_sizes[d].append(
-                            getattr(pixels, attr_d + "_quantity")
-                        )  # returns a pint.Quantity
-                    elif getattr(pixels, attr_d) is not None:
-                        voxel_sizes[d].append(getattr(pixels, attr_d))  # float
-            except NotImplementedError:
-                pass
-        for k in voxel_sizes:
-            voxel_sizes[k] = list(set(voxel_sizes[k]))
-        return voxel_sizes, dims
+        metadata = pwfluoobj.FluoImage.metadata_from_filename(fname)
+        return dict(
+            voxel_size=[metadata["voxel_size"]],
+            image_dim=[metadata["image_dim"]],
+            num_channels=[metadata["num_channels"]],
+            filename=[fname],
+        )
 
     # --------------------------- INFO functions ------------------------------
     def _summary(self) -> List[str]:
