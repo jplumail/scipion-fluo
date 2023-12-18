@@ -315,9 +315,7 @@ class VoxelSize(CsvList, FluoObject):
         if vs is None:
             s = "No-VoxelSize"
         else:
-            xy, z = vs
-            s = "%d x %d" % (xy, xy)
-            s += " x %d" % z
+            s = f"{vs[0]:.2f}x{vs[1]:.2f} μm/px"
         return s
 
 
@@ -531,10 +529,11 @@ class Image(FluoObject):
 
     def __str__(self) -> str:
         """String representation of an Image."""
-        return (
-            f"{self.getClassName()} ({str(self._imageDim)}, "
-            f"{str(self._voxelSize)} μm/px, "
-            f"{str(self._num_channels)} channel(s)))"
+        return "{} ({}, {}, {} channel(s))".format(
+            self.getClassName(),
+            str(self._imageDim),
+            str(self._voxelSize),
+            str(self._num_channels),
         )
 
     def getFiles(self) -> set:
@@ -1236,19 +1235,23 @@ class SetOfCoordinates3D(FluoSet):
 
     def __str__(self) -> str:
         """String representation of a set of coordinates."""
-        if self._boxSize.hasValue():
-            boxSize = float(self._boxSize.get()) / 1000
-            boxStr = f" {boxSize:.1f} x {boxSize:.1f} x {boxSize:.1f} μm"
-        else:
-            boxStr = "No-Box"
         s = "%s (%d items, %s%s)" % (
             self.getClassName(),
             self.getSize(),
-            boxStr,
+            self._voxelSizeStr(),
             self._appendStreamState(),
         )
 
         return s
+
+    def _voxelSizeStr(self) -> str:
+        """Returns how the voxel size is presented in a 'str' context."""
+        voxel_size = self.getVoxelSize()
+
+        if not voxel_size:
+            raise RuntimeError("Voxel size is not set")
+
+        return f"{voxel_size[0]:.2f}x{voxel_size[0]:.2f}x{voxel_size[1]:.2f} μm/px"
 
     def getFirstItem(self) -> Coordinate3D:
         coord = FluoSet.getFirstItem(self)
