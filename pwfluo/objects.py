@@ -712,7 +712,7 @@ class Coordinate3D(FluoObject):
 
     def __init__(self, **kwargs) -> None:
         FluoObject.__init__(self, **kwargs)
-        self._boxSize: float = 0
+        self._boxSize: CsvList = CsvList(pType=float)
         self._imagePointer: Pointer = Pointer(objDoStore=False)  # points to a FluoImage
         self._transform: Transform = Transform()
         self._groupId: Integer = Integer(
@@ -721,6 +721,22 @@ class Coordinate3D(FluoObject):
         self._imgId = String(
             kwargs.get("imageId", None)
         )  # Used to access to the corresponding image from each coord (it's the tsId)
+
+    def setDim(self, w: float, h: float, d: float):
+        if not self._boxSize.isEmpty():
+            self._boxSize.clear()
+        self._boxSize.append(w)
+        self._boxSize.append(h)
+        self._boxSize.append(d)
+
+    def getDim(self) -> Union[Tuple[float, float, float], None]:
+        """Return the dimensions of the first image in the set."""
+        if self._boxSize.isEmpty():
+            return None
+        w, h, d = self._boxSize[0], self._boxSize[1], self._boxSize[2]
+        if (w is None) or (h is None) or (d is None):
+            return None
+        return w, h, d
 
     def setPosition(self, x: float, y: float, z: float) -> None:
         self._transform.setShifts(x, y, z)
