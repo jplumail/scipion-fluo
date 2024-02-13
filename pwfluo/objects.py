@@ -449,7 +449,6 @@ class Image(FluoObject):
                 }
             )
         tifffile.imwrite(filename, data, metadata=metadata)
-        print(kwargs)
         return cls(filename=filename, **kwargs)
 
     @classmethod
