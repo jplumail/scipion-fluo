@@ -1227,7 +1227,8 @@ class SetOfCoordinates3D(FluoSet):
 
     def getBoxSize(self) -> float:
         """Return the box size of the particles."""
-        return self._boxSize.get()
+        bs = self._boxSize.get()
+        return float(bs) if bs else bs
 
     def setBoxSize(self, boxSize: float) -> None:
         """Set the box size of the particles."""
@@ -1401,11 +1402,6 @@ class SetOfCoordinates3D(FluoSet):
 
         return self._images  # type: ignore
 
-    def append(self, item: Coordinate3D) -> None:
-        if self.getBoxSize() is None and item._boxSize:
-            self.setBoxSize(item._boxSize)
-        super().append(item)
-
     def getImgIds(self):
         """Returns all the TS ID (tomoId) present in this set"""
         imgIds = self.aggregate(["MAX"], "_imgId", ["_imgId"])
@@ -1413,10 +1409,10 @@ class SetOfCoordinates3D(FluoSet):
         return imgIds
 
 
-class SetOfParticles(SetOfImages):
+class SetOfParticles(SetOfFluoImages):
     ITEM_TYPE = Particle
     REP_TYPE = Particle
-    EXPOSE_ITEMS = False
+    EXPOSE_ITEMS = True
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -1565,15 +1561,8 @@ class SetOfParticles(SetOfImages):
         im_dim = particle.getDim()
         if im_dim is None:
             raise ValueError(f"Particle {particle} dimension is None.")
-        if dim is not None:
-            if dim != im_dim:
-                raise ValueError(
-                    f"{particle} has different dimension than {self}, "
-                    f"found {dim} and {im_dim}"
-                )
-        else:
+        if dim is None:
             self.setDim(im_dim)
-
         SetOfImages.append(self, particle)
 
 
