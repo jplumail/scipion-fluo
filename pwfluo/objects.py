@@ -424,7 +424,7 @@ class Image(FluoObject):
     def from_data(cls, data: np.ndarray, filename: str, **kwargs):
         """Create an Image from a ndarray. Will write the data to filename.
         data: ndarray of shape (C, Z, Y, X)
-        filename: path to file to write
+        filename: path to file to write, should end with .ome.tiff extension
         kwargs: voxel_size, image_dim
         """
         if "image_dim" in kwargs and kwargs.get("image_dim")[::-1] != data.shape[1:]:
@@ -1057,12 +1057,12 @@ class SetOfImages(FluoSet):
 
         Set.append(self, image)
 
-    def getNumChannels(self) -> int:
+    def getNumChannels(self) -> Optional[int]:
         c = self._num_channels.get()
         if c:
             return c
         else:
-            return 1
+            return None
 
     def setNumChannels(self, c: int) -> None:
         self._num_channels.set(c)
@@ -1153,6 +1153,8 @@ class SetOfImages(FluoSet):
 
     def _channelsStr(self):
         c = self.getNumChannels()
+        if c is None:
+            c = "?"
         return f"{c} channel" if c == 1 else f"{c} channels"
 
     def _dimStr(self) -> str:
