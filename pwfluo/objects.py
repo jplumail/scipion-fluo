@@ -48,6 +48,7 @@ from pyworkflow.object import (
     Set,
     String,
 )
+from scipy.ndimage import zoom
 
 
 class FluoObject(pwobj.Object):
@@ -302,6 +303,7 @@ class VoxelSize(CsvList, FluoObject):
             self[0], self[1] = xy, z
 
     def getVoxelSize(self) -> Optional[Tuple[float, float]]:
+        """returns voxel size in micro meters"""
         if self.isEmpty():
             return None
         return self[0], self[1]
@@ -387,11 +389,16 @@ class Image(FluoObject):
                 for d in "xyz":
                     attr_d = f"physical_size_{d}_quantity"
                     px_size: pint.Quantity = getattr(pixels, attr_d, None)
-                    voxel_sizes[d] = px_size.to("um").magnitude if px_size else None
+                    try:
+                        voxel_sizes[d] = px_size.to("um").magnitude if px_size else None
+                    except pint.errors.DimensionalityError:
+                        voxel_sizes[d] = None
                 assert voxel_sizes["x"] == voxel_sizes["y"]
                 voxel_size = voxel_sizes["x"], voxel_sizes["z"]
                 image_dim = (pixels.size_x, pixels.size_y, pixels.size_z)
                 num_channels = pixels.size_c
+                if num_channels == 1 and pixels.size_t > 1:
+                    num_channels = pixels.size_t
             else:
                 tags = tif.pages[0].tags
                 size_x, size_y = tags["ImageWidth"].value, tags["ImageLength"].value
@@ -432,6 +439,12 @@ class Image(FluoObject):
                 f"Data shape {data.shape[1:]} != {kwargs.get('image_dim')[::-1]}"
             )
         kwargs["image_dim"] = data.shape[:0:-1]
+        if "num_channels" in kwargs and kwargs.get("num_channels") != data.shape[0]:
+            raise ValueError(
+                f"num_channels doesn't match data shape: {data.shape=} "
+                f"and num_channels={kwargs.get('num_channels')}"
+            )
+        kwargs["num_channels"] = data.shape[0]
         if not filename.endswith(".ome.tiff"):
             raise ValueError(
                 f"Filename should have .ome.tiff extension, got {filename}"
@@ -502,17 +515,57 @@ class Image(FluoObject):
         if fname:
             data = tifffile.imread(fname)
             if data.ndim == 2:
-                return data[None, None]
+                ret = data[None, None]
             elif data.ndim == 3:
                 if self.getNumChannels() and self.getNumChannels() > 1:
-                    return data[:, None]
+                    ret = data[:, None]
                 else:
-                    return data[None, :]
+                    ret = data[None, :]
             elif data.ndim == 4:
                 if self.getNumChannels() and data.shape[0] == self.getNumChannels():
-                    return data
+                    ret = data
                 else:
-                    return np.transpose(data, (1, 0, 2, 3))
+                    ret = np.transpose(data, (1, 0, 2, 3))
+            assert ret.shape == (
+                self.getNumChannels(),
+                *self.getDim()[::-1],
+            ), "getData failed: expected shape "
+            f"{(self.getNumChannels(), *self.getDim()[::-1])}, got {ret.shape}"
+            return ret
+
+    def export(self, filename: str, channel: int | None = None, isotropic=False):
+        """export the Image to the disk"""
+        data = None
+        vs = None
+        if isotropic:
+            if self.getVoxelSize() and self.getVoxelSize()[0] != self.getVoxelSize()[1]:
+                data, vs = self.getDataIsotropic()
+        if channel and self.getNumChannels() > 1:
+            # read channel
+            if data is None:
+                data = self.getData()
+            data = data[channel]
+
+        if data is not None:
+            tifffile.imwrite(filename, data)
+        else:
+            os.symlink(self.getFileName(), filename)
+        return True, vs
+
+    def getDataIsotropic(self):
+        """Returns data in (C, Z, Y, X) shape
+        with anisotropy corrected"""
+        data = self.getData()
+        vs = self.getVoxelSize()
+        iso_vs = None
+        if vs:
+            vs_xy, vs_z = vs
+            if vs_xy != vs_z:
+                iso_vs = min(vs_xy, vs_z)
+                data = zoom(
+                    data, (1, vs_z / iso_vs, vs_xy / iso_vs, vs_xy / iso_vs), order=1
+                )
+        return data, iso_vs
 
     def isEmpty(self):
         return self.getFileName() is None
