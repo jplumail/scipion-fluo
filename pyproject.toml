@@ -19,6 +19,7 @@ dependencies = [
     "tifffile",
     "pint",
     "ome-types",
+    "spfluo"
 ]
 
 [project.urls]

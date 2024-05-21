@@ -1,7 +1,11 @@
 # coding=utf-8
 
 
+import os
+
 from pyworkflow import BETA
+from pyworkflow.utils.path import removeExt
+from spfluo.utils.volume import move_center_of_mass_to_center
 
 from pwfluo.objects import (
     FluoImage,
@@ -86,10 +90,31 @@ class ProtImportPSFModel(ProtFluoImportFile):
     _possibleOutputs = {OUTPUT_NAME: PSFModel}
 
     def _insertAllSteps(self):
-        self._insertFunctionStep(
-            self.importImageStep,
-            PSFModel,
+        self._insertFunctionStep(self.importPSFStep)
+
+    def importPSFStep(self) -> None:
+        """Copy the file.
+        Register other parameters.
+        """
+        file_path: str = self.filePath.get()
+        img = PSFModel.from_filename(file_path)
+        voxel_size: tuple[float, float] = self.vs_xy.get(), self.vs_z.get()
+        data = img.getData()
+        for c in range(data.shape[0]):
+            data[c] = move_center_of_mass_to_center(data[c], order=3)
+
+        # Save PSF
+        newFileName = os.path.basename(file_path)
+        if not newFileName.endswith(".ome.tiff"):
+            newFileName, _ = os.path.splitext(newFileName)
+            newFileName = newFileName + ".ome.tiff"
+        img = PSFModel.from_data(
+            data, self._getExtraPath(newFileName), voxel_size=voxel_size
         )
+        imgId = removeExt(newFileName)
+        img.setObjId(imgId)
+
+        self._defineOutputs(**{self.OUTPUT_NAME: img})
 
     # --------------------------- INFO functions ------------------------------
     def _getMessage(self) -> str:
