@@ -195,24 +195,9 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
             img = obj.from_filename(fileName)
             img.setVoxelSize(voxel_size)
 
-            # Set default origin
-            origin = pwfluoobj.Transform()
-            dim = img.getDim()
-            if dim is None:
-                raise ValueError("Image '%s' has no dimension" % fileName)
-            x, y, z = dim
-            origin.setShifts(
-                x / -2.0 * voxel_size[0],
-                y / -2.0 * voxel_size[0],
-                z / -2.0 * voxel_size[1],
-            )
-            img.setOrigin(origin)
-
-            newFileName = os.path.basename(fileName).split(":")[0]
+            newFileName = os.path.basename(fileName)
             if newFileName in fileNameList:
-                newFileName = _getUniqueFileName(
-                    self.getPattern(), fileName.split(":")[0]
-                )
+                newFileName = _getUniqueFileName(self.getPattern(), fileName)
 
             fileNameList.append(newFileName)
 
