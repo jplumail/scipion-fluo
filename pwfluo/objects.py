@@ -1130,6 +1130,17 @@ class SetOfImages(FluoSet):
         """Return first image dimensions as a tuple: (xdim, ydim, zdim)"""
         return self.getFirstItem().getDim()
 
+    def getMaxDataSize(self):
+        """returns the maximum dimension of the set in µm"""
+        vs_xy, vs_z = self.getVoxelSize()
+        max_set = 0
+        for im in self:
+            im: Image
+            dx, dy, dz = im.getDimensions()
+            max_im = max(dx * vs_xy, dy * vs_xy, dz * vs_z)
+            max_set = max(max_set, max_im)
+        return max_set
+
     def __str__(self) -> str:
         """String representation of a set of images."""
         s = "%s (%d items, %s, %s, %s%s)" % (
@@ -1235,6 +1246,25 @@ class SetOfCoordinates3D(FluoSet):
     def setBoxSize(self, boxSize: float) -> None:
         """Set the box size of the particles."""
         self._boxSize.set(boxSize)
+
+    def getMaxBoxSize(self):
+        """Return the box size in um that can contain all particles."""
+        vs = self.getVoxelSize()
+        if vs:
+            vs_xy, vs_z = vs
+        else:
+            vs_xy, vs_z = 1.0, 1.0
+        max_box_size_xy, max_box_size_z = None, None
+        for coord in self.iterItems():
+            coord: Coordinate3D
+            dim = coord.getDim()
+            if dim:
+                dim_px = (dim[0] / vs_xy, dim[1] / vs_xy, dim[2] / vs_z)
+                if (not max_box_size_xy) or max(dim_px[:2]) > max_box_size_xy:
+                    max_box_size_xy = max(dim_px[:2])
+                if (not max_box_size_z) or dim_px[2] > max_box_size_z:
+                    max_box_size_z = dim_px[2]
+        return max_box_size_xy, max_box_size_z
 
     def getVoxelSize(self) -> Union[Tuple[float, float], None]:
         """Return the voxel size of the particles."""
