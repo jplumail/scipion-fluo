@@ -42,6 +42,7 @@ from pyworkflow.utils.path import createAbsLink, removeExt
 from pyworkflow.utils.properties import Message
 
 import pwfluo.objects as pwfluoobj
+from pwfluo.constants import MICRON_STR
 from pwfluo.protocols.import_ import ProtImport, ProtImportFile, ProtImportFiles
 
 
@@ -146,8 +147,8 @@ class ProtFluoImportBase(ProtFluoBase):
             help="The wizard will try to import image parameters.\n"
             "If not found, required ones should be provided.",
         )
-        group.addParam("vs_xy", FloatParam, label="XY (μm/px)")
-        group.addParam("vs_z", FloatParam, label="Z (μm/px)")
+        group.addParam("vs_xy", FloatParam, label=f"XY ({MICRON_STR}/px)")
+        group.addParam("vs_z", FloatParam, label=f"Z ({MICRON_STR}/px)")
 
     # --------------------------- INFO functions ------------------------------
     def _getMessage(self) -> str:
@@ -162,7 +163,7 @@ class ProtFluoImportBase(ProtFluoBase):
             vs_xy, vs_z = self.vs_xy.get(), self.vs_z.get()
             methods.append(
                 f"{self._getMessage()} imported with a voxel size "
-                f"*{vs_xy:.2f}x{vs_z:.2f}* (μm/px)"
+                f"*{vs_xy:.2f}x{vs_z:.2f}* ({MICRON_STR}/px)"
             )
         return methods
 
@@ -238,7 +239,9 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
                 )
 
                 if (vs_xy := self.vs_xy.get()) and (vs_z := self.vs_z.get()):
-                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (μm/px)")
+                    summary.append(
+                        f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* ({MICRON_STR}/px)"
+                    )
 
         except Exception as e:
             print(e)
@@ -339,7 +342,9 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
                 )
 
                 if (vs_xy := self.vs_xy.get()) and (vs_z := self.vs_z.get()):
-                    summary.append(f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* (μm/px)")
+                    summary.append(
+                        f"Voxel size: *{vs_xy:.2f}x{vs_z:.2f}* ({MICRON_STR}/px)"
+                    )
 
         except Exception as e:
             print(e)

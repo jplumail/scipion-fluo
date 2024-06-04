@@ -2,6 +2,7 @@ import pyworkflow.wizard as pwizard
 from pyworkflow.gui import dialog
 from pyworkflow.gui.form import FormWindow
 
+from pwfluo.constants import MICRON_STR
 from pwfluo.protocols.protocol_base import ProtFluoImportFile, ProtFluoImportFiles
 
 
@@ -36,7 +37,10 @@ class ImportAcquisitionWizard(FluoWizard):
             else:
                 msg = "Found multiple values:\n"
                 for vs_ in vs:
-                    msg += f"\tvoxel size: {vs_[0]*1e6:.2f}x{vs_[1]*1e6:.2f} (µm)\n"
+                    msg += (
+                        f"\tvoxel size: {vs_[0]*1e6:.2f}x{vs_[1]*1e6:.2f} "
+                        f"({MICRON_STR})\n"
+                    )
                 dialog.showInfo("Voxel size", msg, form.root)
 
         except FileNotFoundError as e:

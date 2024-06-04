@@ -50,6 +50,8 @@ from pyworkflow.object import (
 )
 from scipy.ndimage import zoom
 
+from pwfluo.constants import MICRON_STR
+
 
 class FluoObject(pwobj.Object):
     """Simple base class from which all objects in this Domain will
@@ -313,14 +315,14 @@ class VoxelSize(CsvList, FluoObject):
         if vs is None:
             s = "No-VoxelSize"
         else:
-            s = f"{vs[0]:.2f}x{vs[1]:.2f} μm/px"
+            s = f"{vs[0]:.2f}x{vs[1]:.2f} {MICRON_STR}/px"
         return s
 
 
 # Taken from https://github.com/4DNucleome/PartSeg/blob/develop/package/PartSegImage/image_reader.py
 name_to_scalar = {
     "micron": 10**-6,
-    "µm": 10**-6,
+    f"{MICRON_STR}": 10**-6,
     "um": 10**-6,
     "nm": 10**-9,
     "mm": 10**-3,
@@ -456,9 +458,9 @@ class Image(FluoObject):
                     "PhysicalSizeX": kwargs.get("voxel_size")[0],
                     "PhysicalSizeY": kwargs.get("voxel_size")[0],
                     "PhysicalSizeZ": kwargs.get("voxel_size")[1],
-                    "PhysicalSizeXUnit": "µm",
-                    "PhysicalSizeYUnit": "µm",
-                    "PhysicalSizeZUnit": "µm",
+                    "PhysicalSizeXUnit": f"{MICRON_STR}",
+                    "PhysicalSizeYUnit": f"{MICRON_STR}",
+                    "PhysicalSizeZUnit": f"{MICRON_STR}",
                 }
             )
         tifffile.imwrite(filename, data, metadata=metadata)
@@ -571,7 +573,7 @@ class Image(FluoObject):
         return self.getFileName() is None
 
     def getVoxelSize(self) -> Optional[Tuple[float, float]]:
-        """Return image voxel size. (µm/pix)"""
+        """Return image voxel size. (um/pix)"""
         return self._voxelSize.getVoxelSize()
 
     def setVoxelSize(self, voxel_size: Tuple[float, float]) -> None:
@@ -1184,7 +1186,7 @@ class SetOfImages(FluoSet):
         return self.getFirstItem().getDim()
 
     def getMaxDataSize(self):
-        """returns the maximum dimension of the set in µm"""
+        """returns the maximum dimension of the set in um"""
         vs_xy, vs_z = self.getVoxelSize()
         max_set = 0
         for im in self:
@@ -1213,7 +1215,7 @@ class SetOfImages(FluoSet):
         if not voxel_size:
             raise RuntimeError("Voxel size is not set")
 
-        return f"{voxel_size[0]:.2f}x{voxel_size[1]:.2f} μm/px"
+        return f"{voxel_size[0]:.2f}x{voxel_size[1]:.2f} {MICRON_STR}/px"
 
     def _channelsStr(self):
         c = self.getNumChannels()
@@ -1458,7 +1460,10 @@ class SetOfCoordinates3D(FluoSet):
         if not voxel_size:
             raise RuntimeError("Voxel size is not set")
 
-        return f"{voxel_size[0]:.2f}x{voxel_size[0]:.2f}x{voxel_size[1]:.2f} μm/px"
+        return (
+            f"{voxel_size[0]:.2f}x{voxel_size[0]:.2f}x{voxel_size[1]:.2f} "
+            f"{MICRON_STR}/px"
+        )
 
     def getFirstItem(self) -> Coordinate3D:
         coord = FluoSet.getFirstItem(self)
