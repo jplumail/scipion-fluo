@@ -200,18 +200,26 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
             if newFileName in fileNameList:
                 newFileName = _getUniqueFileName(self.getPattern(), fileName)
 
+            # If not OME-TIFF file, copy file to .ome.tiff
+            if not newFileName.endswith(".ome.tiff"):
+                newFileName, _ = os.path.splitext(newFileName)
+                newFileName = newFileName + ".ome.tiff"
+                newFilePath = self._getExtraPath(newFileName)
+                img = obj.from_data(img.getData(), newFilePath, voxel_size=voxel_size)
+            else:
+                newFilePath = self._getExtraPath(newFileName)
+                createAbsLink(
+                    os.path.abspath(fileName),
+                    os.path.abspath(newFilePath),
+                )
+                img.setFileName(newFilePath)
+
             fileNameList.append(newFileName)
 
             imgId = removeExt(newFileName)
             img.setImgId(imgId)
-
-            createAbsLink(
-                os.path.abspath(fileName),
-                os.path.abspath(self._getExtraPath(newFileName)),
-            )
-
             img.cleanObjId()
-            img.setFileName(self._getExtraPath(newFileName))
+
             imgSet.append(img)
 
         imgSet.write()
