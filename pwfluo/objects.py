@@ -1215,7 +1215,7 @@ class SetOfImages(FluoSet):
         voxel_size = self.getVoxelSize()
 
         if not voxel_size:
-            raise RuntimeError("Voxel size is not set")
+            return "No pixel size"
 
         return f"{voxel_size[0]:.2f}x{voxel_size[1]:.2f} {MICRON_STR}/px"
 
@@ -1322,6 +1322,25 @@ class SetOfCoordinates3D(FluoSet):
                 if (not max_box_size_z) or dim_px[2] > max_box_size_z:
                     max_box_size_z = dim_px[2]
         return max_box_size_xy, max_box_size_z
+
+    def getMinBoxSize(self):
+        """Return the box size in um that can contain all particles."""
+        vs = self.getVoxelSize()
+        if vs:
+            vs_xy, vs_z = vs
+        else:
+            vs_xy, vs_z = 1.0, 1.0
+        min_box_size_xy, min_box_size_z = None, None
+        for coord in self.iterItems():
+            coord: Coordinate3D
+            dim = coord.getDim()
+            if dim:
+                dim_px = (dim[0] / vs_xy, dim[1] / vs_xy, dim[2] / vs_z)
+                if (not min_box_size_xy) or min(dim_px[:2]) < min_box_size_xy:
+                    min_box_size_xy = min(dim_px[:2])
+                if (not min_box_size_z) or dim_px[2] < min_box_size_z:
+                    min_box_size_z = dim_px[2]
+        return min_box_size_xy, min_box_size_z
 
     def getVoxelSize(self) -> Union[Tuple[float, float], None]:
         """Return the voxel size of the particles."""
@@ -1460,7 +1479,7 @@ class SetOfCoordinates3D(FluoSet):
         voxel_size = self.getVoxelSize()
 
         if not voxel_size:
-            raise RuntimeError("Voxel size is not set")
+            return "No pixel size"
 
         return (
             f"{voxel_size[0]:.2f}x{voxel_size[0]:.2f}x{voxel_size[1]:.2f} "
