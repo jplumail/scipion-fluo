@@ -39,6 +39,7 @@ import pyworkflow.utils as pwutils  # type: ignore
 import tifffile  # type: ignore
 from numpy.typing import NDArray
 from ome_types import from_xml
+from ome_types.model.simple_types import UnitsLength
 from pyworkflow.object import (
     CsvList,
     Integer,
@@ -453,14 +454,15 @@ class Image(FluoObject):
             )
         metadata = {"axes": "CZYX"}
         if "voxel_size" in kwargs:
+            micron_str = UnitsLength.MICROMETER.value
             metadata.update(
                 {
                     "PhysicalSizeX": kwargs.get("voxel_size")[0],
                     "PhysicalSizeY": kwargs.get("voxel_size")[0],
                     "PhysicalSizeZ": kwargs.get("voxel_size")[1],
-                    "PhysicalSizeXUnit": f"{MICRON_STR}",
-                    "PhysicalSizeYUnit": f"{MICRON_STR}",
-                    "PhysicalSizeZUnit": f"{MICRON_STR}",
+                    "PhysicalSizeXUnit": micron_str,
+                    "PhysicalSizeYUnit": micron_str,
+                    "PhysicalSizeZUnit": micron_str,
                 }
             )
         tifffile.imwrite(filename, data, metadata=metadata)
