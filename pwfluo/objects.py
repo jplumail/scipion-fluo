@@ -553,7 +553,7 @@ class Image(FluoObject):
         if data is not None:
             tifffile.imwrite(filename, data)
         else:
-            os.symlink(self.getFileName(), filename)
+            os.symlink(os.path.abspath(self.getFileName()), filename)
         return True, vs
 
     def getDataIsotropic(self):
