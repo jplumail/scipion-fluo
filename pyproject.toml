@@ -25,12 +25,6 @@ dependencies = [
 [project.urls]
 Repository = "https://github.com/jplumail/scipion-fluo"
 
-[tool.hatch.version]
-source = "vcs"
-
-[tool.hatch.build.targets.wheel]
-packages = ["pwfluo"]
-
 [project.optional-dependencies]
 dev = ["ruff", "black", "pre-commit"]
 

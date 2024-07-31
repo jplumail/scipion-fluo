@@ -14,3 +14,11 @@ After that, we might easily install by:
 .. code-block:: bash
 
     pip install scipion-fluo scipion-fluo-spfluo
+
+
+Test
+----
+
+.. code-block:: bash
+
+    hatch run test
