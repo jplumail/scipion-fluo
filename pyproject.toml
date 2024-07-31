@@ -1,9 +1,9 @@
 [build-system]
 requires = [
-    "setuptools >= 60",
-    "setuptools-scm[toml]>=8.0"
+    "hatchling",
+    "hatch-vcs"
 ]
-build-backend = "setuptools.build_meta"
+build-backend = "hatchling.build"
 
 [project]
 name = "scipion-fluo"
@@ -25,7 +25,11 @@ dependencies = [
 [project.urls]
 Repository = "https://github.com/jplumail/scipion-fluo"
 
-[tool.setuptools_scm]
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pwfluo"]
 
 [project.optional-dependencies]
 dev = ["ruff", "black", "pre-commit"]
