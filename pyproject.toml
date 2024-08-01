@@ -27,7 +27,7 @@ dependencies = [
 Repository = "https://github.com/jplumail/scipion-fluo"
 
 [project.optional-dependencies]
-dev = ["ruff", "black", "pre-commit"]
+dev = ["ruff", "pre-commit"]
 
 [project.scripts]
 scipion-fluo = "pwfluo.__main__:main"
