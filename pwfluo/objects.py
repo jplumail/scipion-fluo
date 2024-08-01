@@ -24,6 +24,8 @@
 # *
 # **************************************************************************
 
+from __future__ import annotations
+
 import json
 import math
 import os
@@ -34,10 +36,6 @@ from typing import (
     Dict,
     Iterable,
     Iterator,
-    List,
-    Optional,
-    Tuple,
-    Union,
     cast,
 )
 
@@ -102,7 +100,7 @@ class Matrix(Scalar, FluoObject):
     def __str__(self) -> str:
         return np.array_str(self._matrix)
 
-    def _copy(self, other: "Matrix", *args, **kwargs) -> None:
+    def _copy(self, other: Matrix, *args, **kwargs) -> None:
         """Override the default behaviour of copy
         to also copy array data.
         Copy other into self.
@@ -127,7 +125,7 @@ class Transform(FluoObject):
     ROT_Y_90_COUNTERCLOCKWISE = "rotY90cc"
     ROT_Z_90_COUNTERCLOCKWISE = "rotZ90cc"
 
-    def __init__(self, matrix: Optional[NDArray[np.float64]] = None, **kwargs):
+    def __init__(self, matrix: NDArray[np.float64] | None = None, **kwargs):
         FluoObject.__init__(self, **kwargs)
         self._matrix = Matrix()
         if matrix is not None:
@@ -144,7 +142,7 @@ class Transform(FluoObject):
         M = self.getMatrix()
         return M[:3, 3]
 
-    def getMatrixAsList(self) -> List:
+    def getMatrixAsList(self) -> list:
         """Return the values of the Matrix as a list."""
         return self._matrix.getMatrix().flatten().tolist()
 
@@ -176,7 +174,7 @@ class Transform(FluoObject):
         m[1, 3] = y
         m[2, 3] = z
 
-    def setShiftsTuple(self, shifts: Tuple[float, float, float]) -> None:
+    def setShiftsTuple(self, shifts: tuple[float, float, float]) -> None:
         self.setShifts(shifts[0], shifts[1], shifts[2])
 
     def composeTransform(self, matrix: np.ndarray) -> None:
@@ -186,7 +184,7 @@ class Transform(FluoObject):
         self._matrix.setMatrix(new_matrix)
 
     @classmethod
-    def create(cls, type: str) -> "Transform":
+    def create(cls, type: str) -> Transform:
         """Creates a default Transform object.
         Type is a string: `rot[X,Y,Z]90[c,cc]`
         with `c` meaning clockwise and `cc` counter clockwise
@@ -249,7 +247,7 @@ class ImageDim(CsvList, FluoObject):
     """
 
     def __init__(
-        self, x: Optional[int] = None, y: Optional[int] = None, z: Optional[int] = None
+        self, x: int | None = None, y: int | None = None, z: int | None = None
     ) -> None:
         CsvList.__init__(self, pType=int)
         if x is not None and y is not None:
@@ -258,22 +256,22 @@ class ImageDim(CsvList, FluoObject):
             if z is not None:
                 self.append(z)
 
-    def getX(self) -> Optional[int]:
+    def getX(self) -> int | None:
         if self.isEmpty():
             return None
         return self[0]
 
-    def getY(self) -> Optional[int]:
+    def getY(self) -> int | None:
         if self.isEmpty():
             return None
         return self[1]
 
-    def getZ(self) -> Optional[int]:
+    def getZ(self) -> int | None:
         if self.isEmpty():
             return None
         return self[2]
 
-    def set_(self, dims: Optional[Tuple[int, int, int]]) -> None:
+    def set_(self, dims: tuple[int, int, int] | None) -> None:
         if dims is not None:
             if all(isinstance(dims[i], int) for i in range(3)):
                 if self.isEmpty():
@@ -303,7 +301,7 @@ class VoxelSize(CsvList, FluoObject):
     as XY and Z.
     """
 
-    def __init__(self, xy: Optional[float] = None, z: Optional[float] = None):
+    def __init__(self, xy: float | None = None, z: float | None = None):
         CsvList.__init__(self, pType=float)
         if xy is not None and z is not None:
             self.append(xy)
@@ -316,7 +314,7 @@ class VoxelSize(CsvList, FluoObject):
         else:
             self[0], self[1] = xy, z
 
-    def getVoxelSize(self) -> Optional[Tuple[float, float]]:
+    def getVoxelSize(self) -> tuple[float, float] | None:
         """returns voxel size in micro meters"""
         if self.isEmpty():
             return None
@@ -495,11 +493,11 @@ class Image(FluoObject):
 
     def __init__(
         self,
-        filename: Optional[str] = None,
-        voxel_size: Optional[tuple[float, float]] = None,
-        transform: Optional[np.ndarray[Any, np.float64]] = None,
-        image_dim: Optional[tuple[int, int, int]] = None,
-        num_channels: Optional[int] = None,
+        filename: str | None = None,
+        voxel_size: tuple[float, float] | None = None,
+        transform: np.ndarray[Any, np.float64] | None = None,
+        image_dim: tuple[int, int, int] | None = None,
+        num_channels: int | None = None,
         **kwargs,
     ) -> None:
         """
@@ -589,11 +587,11 @@ class Image(FluoObject):
     def isEmpty(self):
         return self.getFileName() is None
 
-    def getVoxelSize(self) -> Optional[Tuple[float, float]]:
+    def getVoxelSize(self) -> tuple[float, float] | None:
         """Return image voxel size. (um/pix)"""
         return self._voxelSize.getVoxelSize()
 
-    def setVoxelSize(self, voxel_size: Tuple[float, float]) -> None:
+    def setVoxelSize(self, voxel_size: tuple[float, float]) -> None:
         self._voxelSize.setVoxelSize(*voxel_size)
 
     def getFormat(self):
@@ -602,38 +600,38 @@ class Image(FluoObject):
     def getDataType(self):
         return self.img.dtype
 
-    def getDimensions(self) -> Optional[Tuple[int, int, int]]:
+    def getDimensions(self) -> tuple[int, int, int] | None:
         """getDimensions is redundant here but not in setOfImages
         create it makes easier to create protocols for both images
         and sets of images
         """
         return self.getDim()
 
-    def getDim(self) -> Union[Tuple[int, int, int], None]:
+    def getDim(self) -> tuple[int, int, int] | None:
         """Return image dimensions as tuple: (Xdim, Ydim, Zdim)"""
         x, y, z = self._imageDim.getX(), self._imageDim.getY(), self._imageDim.getZ()
         if (x is None) or (y is None) or (z is None):
             return None
         return x, y, z
 
-    def getXDim(self) -> Union[int, None]:
+    def getXDim(self) -> int | None:
         if self._imageDim.getX() is None:
             return None
         return self._imageDim.getX()
 
-    def getYDim(self) -> Union[int, None]:
+    def getYDim(self) -> int | None:
         if self._imageDim.getY() is None:
             return None
         return self._imageDim.getY()
 
-    def getNumChannels(self) -> Union[int, None]:
+    def getNumChannels(self) -> int | None:
         c = self._num_channels.get()
         if c:
             return c
         else:
             return 1
 
-    def getFileName(self) -> Optional[str]:
+    def getFileName(self) -> str | None:
         """Use the _objValue attribute to store filename."""
         fname = self._filename.get()
         if fname is None:
@@ -647,11 +645,11 @@ class Image(FluoObject):
     def getBaseName(self) -> str:
         return os.path.basename(self.getFileName())
 
-    def copyInfo(self, other: "Image") -> None:
+    def copyInfo(self, other: Image) -> None:
         """Copy basic information"""
         self.copyAttributes(other, "_voxelSize")
 
-    def copyFilename(self, other: "Image") -> None:
+    def copyFilename(self, other: Image) -> None:
         """Copy location index and filename from other image."""
         self.setFileName(other.getFileName())
 
@@ -688,7 +686,7 @@ class Image(FluoObject):
         )
         return t  # The identity matrix
 
-    def getShiftsFromOrigin(self) -> Tuple[float, float, float]:
+    def getShiftsFromOrigin(self) -> tuple[float, float, float]:
         origin = self.getOrigin().getShifts()
         x = origin[0]
         y = origin[1]
@@ -710,7 +708,7 @@ class Image(FluoObject):
 
     def originResampled(
         self, originNotResampled: Transform, old_voxel_size: VoxelSize
-    ) -> Optional[Transform]:
+    ) -> Transform | None:
         if self.getVoxelSize() is None or old_voxel_size.getVoxelSize() is None:
             raise RuntimeError("Voxel size is None")
         factor = np.array(self.getVoxelSize()) / np.array(old_voxel_size.getVoxelSize())
@@ -752,10 +750,10 @@ class FluoImage(Image):
         """
         Image.__init__(self, **kwargs)
         # Image location is composed by an index and a filename
-        self._psfModel: Optional[PSFModel] = None
+        self._psfModel: PSFModel | None = None
         self._imgId: String = String(kwargs.get("imgId", None))
 
-    def getImgId(self) -> Union[str, None]:
+    def getImgId(self) -> str | None:
         """Get unique image ID, usually retrieved from the
         file pattern provided by the user at the import time.
         """
@@ -767,7 +765,7 @@ class FluoImage(Image):
     def hasPSF(self) -> bool:
         return self._psfModel is not None
 
-    def getPSF(self) -> Optional[PSFModel]:
+    def getPSF(self) -> PSFModel | None:
         """Return the PSF model"""
         return self._psfModel
 
@@ -800,7 +798,7 @@ class Coordinate3D(FluoObject):
         self._boxSize.append(h)
         self._boxSize.append(d)
 
-    def getDim(self) -> Union[Tuple[float, float, float], None]:
+    def getDim(self) -> tuple[float, float, float] | None:
         """Return the dimensions of the first image in the set."""
         if self._boxSize.isEmpty():
             return None
@@ -816,11 +814,11 @@ class Coordinate3D(FluoObject):
         return self._transform.getShifts()
 
     def setMatrix(
-        self, matrix: NDArray[np.float64], convention: Optional[str] = None
+        self, matrix: NDArray[np.float64], convention: str | None = None
     ) -> None:
         self._transform.setMatrix(matrix)
 
-    def getMatrix(self, convention: Optional[str] = None) -> NDArray[np.float64]:
+    def getMatrix(self, convention: str | None = None) -> NDArray[np.float64]:
         return self._transform.getMatrix()
 
     def eulerAngles(self) -> NDArray[np.float64]:
@@ -839,7 +837,7 @@ class Coordinate3D(FluoObject):
 
         return np.array([x, y, z])
 
-    def getFluoImage(self) -> Union[FluoImage, None]:
+    def getFluoImage(self) -> FluoImage | None:
         """Return the tomogram object to which
         this coordinate is associated.
         """
@@ -855,7 +853,7 @@ class Coordinate3D(FluoObject):
     def setImageId(self, imageId) -> None:
         self._imgId.set(imageId)
 
-    def getImageName(self) -> Union[str, None]:
+    def getImageName(self) -> str | None:
         im = self.getFluoImage()
         if im is None:
             return None
@@ -898,7 +896,7 @@ class Particle(FluoImage):
         # This coordinate is NOT SCALED.
         # To do that, the coordinates and subtomograms voxel sizes
         # should be compared (because of how the extraction protocol works)
-        self._coordinate: Optional[Coordinate3D] = None
+        self._coordinate: Coordinate3D | None = None
         self._imageName: String = String()
 
     def hasCoordinate3D(self) -> bool:
@@ -907,14 +905,14 @@ class Particle(FluoImage):
     def setCoordinate3D(self, coordinate: Coordinate3D) -> None:
         self._coordinate = coordinate
 
-    def getCoordinate3D(self) -> Union[Coordinate3D, None]:
+    def getCoordinate3D(self) -> Coordinate3D | None:
         """Since the object Coordinate3D needs a volume,
         use the information stored in the SubTomogram to
         reconstruct the corresponding Tomogram associated to its Coordinate3D
         """
         return self._coordinate
 
-    def getImageName(self) -> Union[String, None]:
+    def getImageName(self) -> String | None:
         """Return the tomogram filename if the coordinate is not None.
         or have set the _imageName property.
         """
@@ -929,7 +927,7 @@ class Particle(FluoImage):
 class FluoSet(Set, FluoObject):
     _classesDict = None
 
-    def _loadClassesDict(self) -> Dict:
+    def _loadClassesDict(self) -> dict:
         if self._classesDict is None:
             from pyworkflow.plugin import Domain  # type: ignore
 
@@ -938,7 +936,7 @@ class FluoSet(Set, FluoObject):
 
         return self._classesDict
 
-    def copyInfo(self, other: "FluoSet") -> None:
+    def copyInfo(self, other: FluoSet) -> None:
         """Define a dummy copyInfo function to be used
         for some generic operations on sets.
         """
@@ -952,9 +950,9 @@ class FluoSet(Set, FluoObject):
 
     def copyItems(
         self,
-        otherSet: "FluoSet",
-        updateItemCallback: Optional[Callable[[Object, Optional[Any]], Any]] = None,
-        itemDataIterator: Optional[Iterator] = None,
+        otherSet: FluoSet,
+        updateItemCallback: Callable[[Object, Any | None], Any] | None = None,
+        itemDataIterator: Iterator | None = None,
         copyDisabledItems: bool = False,
         doClone: bool = True,
     ) -> None:
@@ -1000,11 +998,11 @@ class FluoSet(Set, FluoObject):
     def create(
         cls,
         outputPath: str,
-        prefix: Optional[str] = None,
-        suffix: Optional[str] = None,
-        ext: Optional[str] = None,
+        prefix: str | None = None,
+        suffix: str | None = None,
+        ext: str | None = None,
         **kwargs,
-    ) -> "FluoSet":
+    ) -> FluoSet:
         """Create an empty set from the current Set class.
         Params:
            outputPath: where the output file will be written.
@@ -1031,12 +1029,12 @@ class FluoSet(Set, FluoObject):
     def createCopy(
         self,
         outputPath: str,
-        prefix: Optional[str] = None,
-        suffix: Optional[str] = None,
-        ext: Optional[str] = None,
+        prefix: str | None = None,
+        suffix: str | None = None,
+        ext: str | None = None,
         copyInfo: bool = False,
         copyItems: bool = False,
-    ) -> "FluoSet":
+    ) -> FluoSet:
         """Make a copy of the current set to another location (e.g file).
         Params:
             outputPath: where the output file will be written.
@@ -1129,7 +1127,7 @@ class SetOfImages(FluoSet):
 
         Set.append(self, image)
 
-    def getNumChannels(self) -> Optional[int]:
+    def getNumChannels(self) -> int | None:
         c = self._num_channels.get()
         if c:
             return c
@@ -1139,13 +1137,13 @@ class SetOfImages(FluoSet):
     def setNumChannels(self, c: int) -> None:
         self._num_channels.set(c)
 
-    def setDim(self, dim: Union[Tuple[int, int, int], None]) -> None:
+    def setDim(self, dim: tuple[int, int, int] | None) -> None:
         """Store dimensions.
         This function should be called only once, to avoid reading
         dimension from image file."""
         self._dim.set_(dim)
 
-    def copyInfo(self, other: "SetOfImages") -> None:
+    def copyInfo(self, other: SetOfImages) -> None:
         """Copy basic information (voxel size and psf)
         from other set of images to current one"""
         self.copyAttributes(other, "_voxelSize")
@@ -1167,11 +1165,11 @@ class SetOfImages(FluoSet):
             raise RuntimeError("Couldn't downsample, voxel size is not set")
         self.setVoxelSize((vs[0] * downFactor, vs[1] * downFactor))
 
-    def setVoxelSize(self, voxelSize: Tuple[float, float]) -> None:
+    def setVoxelSize(self, voxelSize: tuple[float, float]) -> None:
         """Set the voxel size and adjust the scannedPixelSize."""
         self._voxelSize.setVoxelSize(*voxelSize)
 
-    def getVoxelSize(self) -> Union[Tuple[float, float], None]:
+    def getVoxelSize(self) -> tuple[float, float] | None:
         return self._voxelSize.getVoxelSize()
 
     def writeSet(self, applyTransform: bool = False) -> None:
@@ -1182,13 +1180,13 @@ class SetOfImages(FluoSet):
     def create_image(cls, filename):
         return cls.ITEM_TYPE(data=filename)
 
-    def readSet(self, files: List[str]) -> None:
+    def readSet(self, files: list[str]) -> None:
         """Populate the set with the images in the stack"""
         for i in range(len(files)):
             img = self.create_image(files[i])
             self.append(img)
 
-    def getDim(self) -> Union[Tuple[int, int, int], None]:
+    def getDim(self) -> tuple[int, int, int] | None:
         """Return the dimensions of the first image in the set."""
         if self._dim.isEmpty():
             return None
@@ -1198,7 +1196,7 @@ class SetOfImages(FluoSet):
             return None
         return x, y, z
 
-    def getDimensions(self) -> Union[Tuple[int, int, int], None]:
+    def getDimensions(self) -> tuple[int, int, int] | None:
         """Return first image dimensions as a tuple: (xdim, ydim, zdim)"""
         return self.getFirstItem().getDim()
 
@@ -1244,7 +1242,7 @@ class SetOfImages(FluoSet):
         """Return the string representing the dimensions."""
         return str(self._dim)
 
-    def appendFromImages(self, imagesSet: "SetOfImages") -> None:
+    def appendFromImages(self, imagesSet: SetOfImages) -> None:
         """Iterate over the images and append
         every image that is enabled.
         """
@@ -1272,7 +1270,7 @@ class SetOfFluoImages(SetOfImages):
 
     def __init__(self, *args, **kwargs) -> None:
         SetOfImages.__init__(self, **kwargs)
-        self._psf: Optional[PSFModel] = None
+        self._psf: PSFModel | None = None
 
     def hasPSF(self) -> bool:
         return self._psf is not None
@@ -1308,7 +1306,7 @@ class SetOfCoordinates3D(FluoSet):
         self._precedentsPointer: Pointer = (
             Pointer()
         )  # Points to the SetOfFluoImages associated to
-        self._images: Optional[Dict[str, FluoImage]] = None
+        self._images: dict[str, FluoImage] | None = None
 
     def getBoxSize(self) -> float:
         """Return the box size of the particles."""
@@ -1357,11 +1355,11 @@ class SetOfCoordinates3D(FluoSet):
                     min_box_size_z = dim_px[2]
         return min_box_size_xy, min_box_size_z
 
-    def getVoxelSize(self) -> Union[Tuple[float, float], None]:
+    def getVoxelSize(self) -> tuple[float, float] | None:
         """Return the voxel size of the particles."""
         return self._voxelSize.getVoxelSize()
 
-    def setVoxelSize(self, voxel_size: Tuple[float, float]) -> None:
+    def setVoxelSize(self, voxel_size: tuple[float, float]) -> None:
         """Set the voxel size of the particles."""
         self._voxelSize.setVoxelSize(*voxel_size)
 
@@ -1376,7 +1374,7 @@ class SetOfCoordinates3D(FluoSet):
         pass
 
     def iterCoordinates(
-        self, image: Optional[FluoImage] = None, orderBy: str = "id"
+        self, image: FluoImage | None = None, orderBy: str = "id"
     ) -> Iterable[Coordinate3D]:
         """Iterate over the coordinates associated with an image.
         If image=None, the iteration is performed over the whole
@@ -1433,7 +1431,7 @@ class SetOfCoordinates3D(FluoSet):
         else:
             return imgs[imgId]
 
-    def _getFluoImages(self) -> Dict[str, FluoImage]:
+    def _getFluoImages(self) -> dict[str, FluoImage]:
         imgs = self._images
         if imgs is None:
             imgs = dict()
@@ -1448,7 +1446,7 @@ class SetOfCoordinates3D(FluoSet):
     def getPrecedent(self, imgId):
         return self.getPrecedentsInvolved()[imgId]
 
-    def setPrecedents(self, precedents: Union[SetOfFluoImages, Pointer]) -> None:
+    def setPrecedents(self, precedents: SetOfFluoImages | Pointer) -> None:
         """Set the images associated with this set of coordinates.
         Params:
             precedents: Either a SetOfFluoImages or a pointer to it.
@@ -1469,7 +1467,7 @@ class SetOfCoordinates3D(FluoSet):
         summary.append("Particle size: %s" % self.getBoxSize())
         return "\n".join(summary)
 
-    def copyInfo(self, other: "SetOfCoordinates3D") -> None:
+    def copyInfo(self, other: SetOfCoordinates3D) -> None:
         """Copy basic information (id and other properties) but not _mapperPath or _size
         from other set of objects to current one.
         """
@@ -1543,9 +1541,9 @@ class SetOfParticles(SetOfFluoImages):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._coordsPointer: Pointer = Pointer()
-        self._images: Optional[Dict[str, FluoImage]] = None
+        self._images: dict[str, FluoImage] | None = None
 
-    def copyInfo(self, other: "SetOfParticles") -> None:
+    def copyInfo(self, other: SetOfParticles) -> None:
         """Copy basic information (voxel size and ctf)
         from other set of images to current one"""
         super().copyInfo(other)
@@ -1555,15 +1553,13 @@ class SetOfParticles(SetOfFluoImages):
     def hasCoordinates3D(self) -> bool:
         return self._coordsPointer.hasValue()
 
-    def getCoordinates3D(
-        self, asPointer: bool = False
-    ) -> Union[Pointer, SetOfCoordinates3D]:
+    def getCoordinates3D(self, asPointer: bool = False) -> Pointer | SetOfCoordinates3D:
         """Returns the SetOfCoordinates associated with
         this SetOfParticles"""
 
         return self._coordsPointer if asPointer else self._coordsPointer.get()
 
-    def setCoordinates3D(self, coordinates: Union[Pointer, SetOfCoordinates3D]) -> None:
+    def setCoordinates3D(self, coordinates: Pointer | SetOfCoordinates3D) -> None:
         """Set the SetOfCoordinates associated with
         this set of particles.
         """
@@ -1573,8 +1569,8 @@ class SetOfParticles(SetOfFluoImages):
             self._coordsPointer.set(coordinates)  # FIXME: strange?
 
     def iterCoordinates(
-        self, image: Optional[FluoImage] = None, orderBy: str = "id"
-    ) -> Iterator[Union[Coordinate3D, None]]:
+        self, image: FluoImage | None = None, orderBy: str = "id"
+    ) -> Iterator[Coordinate3D | None]:
         """Mimics SetOfCoordinates.iterCoordinates
         so can be passed to viewers or protocols transparently"""
         if self.hasCoordinates3D():
@@ -1587,7 +1583,7 @@ class SetOfParticles(SetOfFluoImages):
             yield None
 
     def iterParticles(
-        self, image: Optional[FluoImage] = None, orderBy: str = "id"
+        self, image: FluoImage | None = None, orderBy: str = "id"
     ) -> Iterator[Particle]:
         """Iterates over the particles, enriching them with the related image
         if apply so coordinate getters and setters will work
@@ -1630,7 +1626,7 @@ class SetOfParticles(SetOfFluoImages):
                 particle.getCoordinate3D().setVolume(self.getFluoImage(particle))
             yield particle
 
-    def getFluoImage(self, particle: Particle) -> Union[FluoImage, None]:
+    def getFluoImage(self, particle: Particle) -> FluoImage | None:
         """returns and caches the tomogram related with a subtomogram.
         If the subtomograms were imported and not associated to any tomogram,
         it returns None.
@@ -1665,7 +1661,7 @@ class SetOfParticles(SetOfFluoImages):
             self._images = dict()
         # self._images = typing.cast(Dict[str, FluoImage], self._images)
 
-    def getFluoImages(self) -> Dict[str, FluoImage]:
+    def getFluoImages(self) -> dict[str, FluoImage]:
         """Returns a list  with only the tomograms involved in the subtomograms.
         May differ when subsets are done."""
 

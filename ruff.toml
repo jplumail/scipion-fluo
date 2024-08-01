@@ -2,6 +2,7 @@
 select = [
     "E", "F", # default
     "I", # isort
+    "UP006", "UP007", "UP037", # upgrade type annotations
 ]
 
 [lint.isort]
