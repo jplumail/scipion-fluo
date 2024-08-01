@@ -24,9 +24,11 @@
 # *
 # **************************************************************************
 
+from __future__ import annotations
+
 import os
 import re
-from typing import List, Optional, Type, TypeVar
+from typing import TypeVar
 
 import pyworkflow as pw
 import pyworkflow.protocol.params as params
@@ -58,7 +60,7 @@ class ProtFluoBase:
     T = TypeVar("T", bound=Set)
     OUTPUT_PREFIX: str
 
-    def _createSet(self, SetClass: Type[T], template, suffix, **kwargs):
+    def _createSet(self, SetClass: type[T], template, suffix, **kwargs):
         """Create a set and set the filename using the suffix.
         If the file exists, it will be deleted."""
         setFn = self._getPath(template % suffix)
@@ -122,7 +124,7 @@ class ProtFluoPicking(ProtImport, ProtFluoBase):
             help="Select the Image to be used during picking.",
         )
 
-    def _summary(self) -> List[str]:
+    def _summary(self) -> list[str]:
         summary = []
         if self.isFinished() and self.getOutputsSize() >= 1:
             for key, output in self.iterOutputAttributes():
@@ -157,7 +159,7 @@ class ProtFluoImportBase(ProtFluoBase):
     def _hasOutput(self):
         return self.images is not None
 
-    def _methods(self) -> List[str]:
+    def _methods(self) -> list[str]:
         methods = []
         if self._hasOutput():
             vs_xy, vs_z = self.vs_xy.get(), self.vs_z.get()
@@ -175,7 +177,7 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
         ProtImportFiles.__init__(self, **args)
         ProtFluoImportBase.__init__(self)
 
-    def importStep(self, obj: Type[T]):
+    def importStep(self, obj: type[T]):
         """Copy images matching the filename pattern
         Register other parameters.
         """
@@ -238,7 +240,7 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
         return metadatas
 
     # --------------------------- INFO functions ------------------------------
-    def _summary(self) -> List[str]:
+    def _summary(self) -> list[str]:
         try:
             summary = []
             if self._hasOutput():
@@ -256,7 +258,7 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
 
         return summary
 
-    def _getVolumeFileName(self, fileName: str, extension: Optional[str] = None) -> str:
+    def _getVolumeFileName(self, fileName: str, extension: str | None = None) -> str:
         if extension is not None:
             baseFileName = (
                 "import_"
@@ -268,7 +270,7 @@ class ProtFluoImportFiles(ProtFluoImportBase, ProtImportFiles):
 
         return self._getExtraPath(baseFileName)
 
-    def _validate(self) -> List[str]:
+    def _validate(self) -> list[str]:
         errors = []
         try:
             next(self.iterFiles())
@@ -341,7 +343,7 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
         )
 
     # --------------------------- INFO functions ------------------------------
-    def _summary(self) -> List[str]:
+    def _summary(self) -> list[str]:
         try:
             summary = []
             if self._hasOutput():
@@ -359,7 +361,7 @@ class ProtFluoImportFile(ProtFluoImportBase, ProtImportFile):
 
         return summary
 
-    def _getVolumeFileName(self, fileName: str, extension: Optional[str] = None) -> str:
+    def _getVolumeFileName(self, fileName: str, extension: str | None = None) -> str:
         if extension is not None:
             baseFileName = (
                 "import_"
