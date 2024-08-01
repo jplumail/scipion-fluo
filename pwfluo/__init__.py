@@ -91,13 +91,13 @@ if not os.path.exists(hostsFile):
 
 os.environ["SCIPION_VERSION"] = "FLUO - " + __version__
 os.environ["SCIPION_HOME"] = pw.Config.SCIPION_HOME = Config.SCIPION_FLUO_HOME
-os.environ[
-    "SCIPION_USER_DATA"
-] = pw.Config.SCIPION_USER_DATA = Config.SCIPION_FLUO_USERDATA
+os.environ["SCIPION_USER_DATA"] = pw.Config.SCIPION_USER_DATA = (
+    Config.SCIPION_FLUO_USERDATA
+)
 os.environ["SCIPION_HOSTS"] = pw.Config.SCIPION_HOSTS = hostsFile
-os.environ[
-    "SCIPION_TESTS_OUTPUT"
-] = pw.Config.SCIPION_TESTS_OUTPUT = Config.SCIPION_FLUO_TEST_OUTPUT
+os.environ["SCIPION_TESTS_OUTPUT"] = pw.Config.SCIPION_TESTS_OUTPUT = (
+    Config.SCIPION_FLUO_TEST_OUTPUT
+)
 
 pw.Config.setDomain("pwfluo")
 

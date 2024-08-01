@@ -1,7 +1,6 @@
-from pwfluo.objects import AverageParticle, SetOfParticles
-from pwfluo.protocols import ProtImportPSFModel, ProtImportSetOfParticles
 from pyworkflow.tests import BaseTest, DataSet, setupTestProject
 
+from pwfluo.protocols import ProtImportPSFModel, ProtImportSetOfParticles
 
 
 class TestProtocolFluoBase(BaseTest):
@@ -43,7 +42,7 @@ class TestProtocolFluoBase(BaseTest):
         cls.launchProtocol(protImportPSFModel)
         psfImported = protImportPSFModel.PSFModel
         return psfImported
-    
+
     def test_import_data(self):
         self.assertIsNotNone(self.particles)
         self.assertIsNotNone(self.psf)
