@@ -7,6 +7,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "scipion-fluo"
+requires-python = ">=3.8"
 description = "Base pyworkflow plugin for Fluorescence image processing"
 readme = "README.rst"
 authors = [{name = "Jean Plumail", email = "jplumail@unistra.fr"}]
