@@ -1,0 +1,9 @@
+[lint]
+select = [
+    "E", "F", # default
+    "I", # isort
+]
+
+[lint.isort]
+known-first-party = ["pwfluo"]
+known-third-party = ["pyworkflow"]

@@ -33,13 +33,3 @@ scipion-fluo = "pwfluo.__main__:main"
 
 [project.entry-points."pyworkflow.plugin"]
 pwfluo = "pwfluo"
-
-[tool.ruff]
-select = [
-    "E", "F", # default
-    "I", # isort
-]
-
-[tool.ruff.isort]
-known-first-party = ["pwfluo"]
-known-third-party = ["pyworkflow"]
