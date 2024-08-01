@@ -5,12 +5,14 @@ source = "vcs"
 packages = ["pwfluo"]
 
 [envs.default]
-installer = "uv"
+installer = "pip"
 dependencies = ["scipion-app"]
-python = "3.11"
+
+[[envs.default.matrix]]
+python = ["3.8", "3.9", "3.10", "3.11"]
 
 [envs.default.env-vars]
-UV_INDEX_URL = "https://pypi.spfluo.ovh/jean/dev/+simple"
+PIP_INDEX_URL = "https://pypi.spfluo.ovh/jean/dev/+simple"
 
 [envs.default.scripts]
 test = "python -m scipion tests pwfluo.tests.test_fluo_base --run"
