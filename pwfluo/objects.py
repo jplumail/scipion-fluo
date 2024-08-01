@@ -28,7 +28,18 @@ import json
 import math
 import os
 import typing
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 import numpy as np
 import pint
@@ -340,7 +351,7 @@ name_to_scalar = {
 
 def read_resolution_from_tags(
     image_file: tifffile.TiffFile,
-) -> tuple[float | None, float | None]:
+):
     tags = image_file.pages[0].tags
     try:
         if image_file.is_imagej:
@@ -357,8 +368,12 @@ def read_resolution_from_tags(
                     f"{tags['ResolutionUnit'].value}"
                 )
 
-        x_spacing = tags["XResolution"].value[1] / tags["XResolution"].value[0] * scalar
-        y_spacing = tags["YResolution"].value[1] / tags["YResolution"].value[0] * scalar
+        x_res0 = cast(float, tags["XResolution"].value[0])
+        y_res0 = cast(float, tags["YResolution"].value[0])
+        x_res1 = cast(float, tags["XResolution"].value[1])
+        y_res1 = cast(float, tags["YResolution"].value[1])
+        x_spacing = x_res1 / x_res0 * scalar
+        y_spacing = y_res1 / y_res0 * scalar
     except (KeyError, ZeroDivisionError):
         x_spacing, y_spacing = None, None
     return x_spacing, y_spacing
