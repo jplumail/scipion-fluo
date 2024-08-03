@@ -1,3 +1,5 @@
+metadata.allow-direct-references = true
+
 [version]
 source = "vcs"
 
@@ -5,14 +7,11 @@ source = "vcs"
 packages = ["pwfluo"]
 
 [envs.default]
-installer = "pip"
-dependencies = ["scipion-app"]
+installer = "uv"
+dependencies = ["scipion-app @ git+ssh://git@github.com/jplumail/scipion-app@fluo"]
 
 [[envs.default.matrix]]
 python = ["3.8", "3.9", "3.10", "3.11"]
-
-[envs.default.env-vars]
-PIP_EXTRA_INDEX_URL = "https://pypi.spfluo.ovh/jean/dev/+simple"
 
 [envs.default.scripts]
 test = "python -m scipion tests pwfluo.tests.test_fluo_base --run"
