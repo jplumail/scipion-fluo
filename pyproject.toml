@@ -21,7 +21,6 @@ dependencies = [
     "tifffile",
     "pint",
     "ome-types",
-    "spfluo @ git+ssh://git@github.com/jplumail/spfluo"
 ]
 
 [project.urls]

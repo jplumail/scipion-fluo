@@ -3,9 +3,10 @@
 
 import os
 
+import numpy as np
 from pyworkflow import BETA
 from pyworkflow.utils.path import removeExt
-from spfluo.utils.volume import move_center_of_mass_to_center
+from scipy.ndimage import center_of_mass, shift
 
 from pwfluo.objects import (
     FluoImage,
@@ -15,6 +16,11 @@ from pwfluo.objects import (
     SetOfParticles,
 )
 from pwfluo.protocols.protocol_base import ProtFluoImportFile, ProtFluoImportFiles
+
+
+def move_center_of_mass_to_center(volume: np.ndarray, order: int = 1):
+    tvec = (np.asarray(volume.shape) - 1) / 2 - np.asarray(center_of_mass(volume))
+    return shift(volume, np.asarray(tvec), order=order)
 
 
 class ProtImportFluoImages(ProtFluoImportFiles):
