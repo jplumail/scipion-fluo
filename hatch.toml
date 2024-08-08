@@ -10,8 +10,11 @@ packages = ["pwfluo"]
 installer = "uv"
 dependencies = ["scipion-app @ git+ssh://git@github.com/jplumail/scipion-app@fluo"]
 
+[envs.default.env-vars]
+SCIPION_DOMAIN = "pwfluo"
+
 [[envs.default.matrix]]
-python = ["3.8", "3.9", "3.10", "3.11"]
+python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
 [envs.default.scripts]
 test = "python -m scipion tests pwfluo.tests.test_fluo_base --run"
