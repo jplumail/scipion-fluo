@@ -14,8 +14,7 @@ authors = [{name = "Jean Plumail", email = "jplumail@unistra.fr"}]
 keywords = ["scipion", "fluorescence", "imageprocessing", "scipion-3.0"]
 dynamic = ["version"]
 dependencies = [
-    "scipion-pyworkflow @ git+ssh://git@github.com/jplumail/scipion-pyworkflow@windows ; platform_system == 'Windows'",
-    "scipion-pyworkflow>=3.3 ; platform_system == 'Linux'",
+    "scipion-pyworkflow>=3.3",
     "scipy",
     "numpy",
     "tifffile",

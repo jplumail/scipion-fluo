@@ -8,7 +8,10 @@ packages = ["pwfluo"]
 
 [envs.default]
 installer = "uv"
-dependencies = ["scipion-app @ git+ssh://git@github.com/jplumail/scipion-app@fluo"]
+dependencies = [
+    "scipion-app @ git+ssh://git@github.com/jplumail/scipion-app@fluo",
+    "scipion-pyworkflow @ git+ssh://git@github.com/jplumail/scipion-pyworkflow@windows"
+]
 
 [envs.default.env-vars]
 SCIPION_DOMAIN = "pwfluo"
